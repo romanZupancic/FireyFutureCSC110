@@ -2,15 +2,74 @@
 
 import requests
 import pandas as pd
+import json
+import os
 
-
-DELIMITER = '","'  # Since the government likes microsoft, we have to use wired delimiters
+# 58526
+DELIMITER = '","'  # Since the government likes microsoft, we have to use weird delimiters
 DATA_DIRECTORY = "./data"
+
+geojson = f'{DATA_DIRECTORY}/Fire_Disturbance_Area.json'
+
+def assemble_fire_disturbance_point() -> pd.DataFrame:
+    fires = pd.read_csv('fires_point.csv')
+    fires = fires.rename(columns={'X': 'longitude', 'Y': 'latitude'})
+    for row, item in fires.iterrows():
+        print(row)
+        if int(item['FIRE_START_DATE'].split('/')[0]) < 1998:
+            fires.drop(row)
+    return fires
+
+
+def assemble_fire_disturbance_area() -> pd.DataFrame:
+    with open(geojson) as json_file:
+        data = json.load(json_file)
+        
+        properties_so_far = []
+        
+        for row in data['features']:
+            if int(row['properties']['FIRE_START_DATE'].split('/')[0]) >= 1998:                
+                properties = [row['properties']['OGF_ID'],
+                          row['properties']['FIRE_TYPE_CODE'],
+                          row['properties']['FIRE_START_DATE'],
+                          row['properties']['FIRE_GENERAL_CAUSE_CODE'],
+                          row['properties']['FIRE_FINAL_SIZE']
+                          ]
+
+                if row['geometry']['type'] == 'MultiPolygon':
+                    collapsed = [coord for sub1 in row['geometry']['coordinates']
+                                    for sub2 in sub1
+                                    for coord in sub2]
+
+                if row['geometry']['type'] == 'Polygon':
+                    collapsed = [coord for sub1 in row['geometry']['coordinates']
+                                    for coord in sub1]
+                avg_long = sum([coord[0] for coord in collapsed]) / len(collapsed)
+                avg_lat = sum([coord[1] for coord in collapsed]) / len(collapsed)
+                properties.append(avg_long)   
+                properties.append(avg_lat)
+                #print(collapsed)
+                
+            
+                properties_so_far.append(properties)
+
+        columnLabels = ['OGF_ID', 
+                        'FIRE_TYPE_CODE', 
+                        'FIRE_START_DATE', 
+                        'FIRE_GENERAL_CAUSE_CODE', 
+                        'FIRE_FINAL_SIZE',
+                        'LONGITUDE',
+                        'LATITUDE']
+        return pd.DataFrame(properties_so_far, columns = columnLabels)
+    
+def make_fire_disturbance_area_csv():
+    data = assemble_fire_disturbance_area()
+    data.to_csv(f'{DATA_DIRECTORY}/processed_data/fire_disturbance_point.csv')
 
 
 #  Assemble the weather data
-def get_station_data(min_year: int) -> pd.DataFrame:
-    unfiltered = pd.read_csv('./data/Station Inventory EN Full.csv', header=[2])
+def filter_stations(min_year: int) -> pd.DataFrame:
+    unfiltered = pd.read_csv(f'{DATA_DIRECTORY}/Station Inventory EN Full.csv', header=[2])
 
     filtered_first_year = unfiltered[unfiltered['First Year'] <= min_year]
     filtered_last_year = filtered_first_year[unfiltered['Last Year'] == 2020]
@@ -18,7 +77,7 @@ def get_station_data(min_year: int) -> pd.DataFrame:
     return filtered_province
 
 
-def get_weather_data_by_station(stationID: int, min_year: int, max_year: int):
+def assemble_weather_data_by_station(stationID: int, min_year: int, max_year: int) -> pd.DataFrame:
     print(f'min_year: {min_year}, max_year: {max_year}')
     data_frames = []
 
@@ -41,26 +100,30 @@ def get_weather_data_by_station(stationID: int, min_year: int, max_year: int):
     return pd.concat(data_frames)
 
 
-def get_relevant_weather_data():
-    stations = get_station_data(1990)
+def make_relevant_weather_data(year: int = 1998) -> None:
+    stations = filter_stations(year)
 
     for _, station in stations.iterrows():
         print(station)
-        data = get_weather_data_by_station(station['Station ID'],
-                                           station['First Year'], station['Last Year'])
+        data = assemble_weather_data_by_station(station['Station ID'],
+                                                year, station['Last Year'])
 
-        data.to_csv(f'./data/weather_data/{station["Station ID"]}.csv')
+        data.to_csv(f'{DATA_DIRECTORY}/weather_data/{station["Name"]}_{station["Station ID"]}.csv')
+        
+
+fire_point_data = assemble_fire_disturbance_point()
+fire_area_data = assemble_fire_disturbance_area()
 
 
-# Assemble the Fire Disturbance Area Data
-def get_fire_data():
-    pure_fire_area = pd.read_csv(f'{DATA_DIRECTORY}/Fire_Disturbance_Area.csv')
-    ogf_ids = pd.read_csv(f'{DATA_DIRECTORY}/Geographic_Names_Ontario.csv')
+def make_big_weather_data():
+    data_frames = [pd.read_csv(f'{DATA_DIRECTORY}/weather_data/{file}') 
+                   for file in os.listdir(f'{DATA_DIRECTORY}/weather_data/') if '.csv' in file]
+    
+    return pd.concat(data_frames)
 
-    return pd.merge(pure_fire_area, ogf_ids, on='OGF_ID')
 
 
 if __name__ == '__main__':
-    answer = get_fire_data()
-    print(answer)
-    breakpoint()
+    # print(answer)
+    pass
+    

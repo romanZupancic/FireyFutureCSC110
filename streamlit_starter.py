@@ -2,12 +2,12 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from PIL import Image
-import map_data
 import pydeck as pdk
+import assemble_data
 
 img = Image.open('forest_fire.jpg')
 st.image(img, use_column_width=True)
-st.title('Ontario\'s Fiery Future')
+st.title('Abstract')
 
 st.write("""Forest fires have always posed a major threat to Canadian forests.
         The National Forestry database estimates that Canada endures on average
@@ -29,16 +29,24 @@ st.write("""Forest fires have always posed a major threat to Canadian forests.
         back to 2003. Our goal is to analyze how changes in weather patterns
         have affected the number and size of forest fires in Ontario.""")
 
-st.map(map_data.fires)
+st.title('Preliminary Data Analysis')
+
+st.write('The following map displays data for ')
 st.pydeck_chart(pdk.Deck(
-     map_style='mapbox://styles/mapbox/dark-v9',
-     initial_view_state=pdk.ViewState(
-         latitude=46,
-         longitude=-79,
-         zoom=5,
-         pitch=30,
-     ),
-     layers=[
+    map_style='mapbox://styles/mapbox/light-v9',
+    initial_view_state=pdk.ViewState(
+        latitude=46,
+        longitude=-79,
+        zoom=5,
+        pitch=30
+    ),
+    layers=[
+        pdk.Layer(
+            "HeatmapLayer",
+            data=assemble_data.fire_point_data,
+            opacity=0.3,
+            get_position='[longitude, latitude]'
+        )
         #  pdk.Layer(
         #     'HexagonLayer',
         #     data=map_data.fires,
@@ -48,12 +56,6 @@ st.pydeck_chart(pdk.Deck(
         #     elevation_range=[0, 1000],
         #     extruded=True
         #  ),
-        pdk.Layer(
-           "HeatmapLayer",
-           data=map_data.fires,
-           opacity=0.8,
-           get_position='[longitude, latitude]',
-        )
         # pdk.Layer(
         #     "ContourLayer",
         #     data=map_data.fires,
@@ -61,5 +63,40 @@ st.pydeck_chart(pdk.Deck(
         #     cell_size=8000
             
         # )
-     ],
- ))
+    ]
+))
+
+st.write('Fire Area')
+st.pydeck_chart(pdk.Deck(
+    map_style='mapbox://styles/mapbox/light-v9',
+    initial_view_state=pdk.ViewState(
+        latitude=50,
+        longitude=-86,
+        zoom=4,
+        pitch=30
+    ),
+    layers=[
+        pdk.Layer(
+            "HeatmapLayer",
+            data=assemble_data.fire_area_data,
+            opacity=0.3,
+            get_position='[LONGITUDE, LATITUDE]'
+        )
+        #  pdk.Layer(
+        #     'HexagonLayer',
+        #     data=map_data.fires,
+        #     radius=8000,
+        #     get_position='[longitude, latitude]',
+        #     elevation_scale=30,
+        #     elevation_range=[0, 1000],
+        #     extruded=True
+        #  ),
+        # pdk.Layer(
+        #     "ContourLayer",
+        #     data=map_data.fires,
+        #     get_position='[longitude, latitude]',
+        #     cell_size=8000
+            
+        # )
+    ]
+))
