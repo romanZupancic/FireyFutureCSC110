@@ -1,12 +1,19 @@
+# Third-party modules
 import streamlit as st
 import pandas as pd
+import pydeck as pdk
 import numpy as np
 from PIL import Image
-import pydeck as pdk
-import assemble_data
+import altair as alt
 
-fire_point = assemble_data.read_fire_disturbance_point()
-fire_area = assemble_data.read_fire_disturbance_area()
+# Custom modules
+import assemble_data
+import data_processing
+
+FIRE_POINT = assemble_data.read_fire_disturbance_point()
+FIRE_AREA = assemble_data.read_fire_disturbance_area()
+
+FIRE_POINT_CAUSE = data_processing.fire_point_cause_count(FIRE_POINT)
 
 img = Image.open('forest_fire2.jpg')
 st.image(img, use_column_width=True)
@@ -50,7 +57,7 @@ st.pydeck_chart(pdk.Deck(
     layers=[
         pdk.Layer(
             "HeatmapLayer",
-            data=fire_point,
+            data=FIRE_POINT,
             opacity=0.3,
             get_position='[longitude, latitude]'
         )
@@ -91,7 +98,7 @@ st.pydeck_chart(pdk.Deck(
     layers=[
         pdk.Layer(
             "HeatmapLayer",
-            data=fire_area,
+            data=FIRE_AREA,
             opacity=0.3,
             get_position='[LONGITUDE, LATITUDE]'
         )
@@ -118,4 +125,9 @@ st.write('''The data sets we aquired have a few built in metrics we can
 compare fire intensity, size, and frequency to. For example, over our
 datasets, the common causes are:''')
 
-st.bar_chart(fire_area['FIRE_GENERAL_CAUSE_CODE'])
+st.bar_chart(data=FIRE_POINT_CAUSE)
+
+cause_alt = alt.Chart(data_processing.fire_area_cause_count(FIRE_AREA)).mark_bar().encode(
+    x='Cause of Fire', y='Occurances in dataset')
+
+st.altair_chart(cause_alt)
