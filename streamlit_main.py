@@ -118,4 +118,4 @@ st.write('''The data sets we aquired have a few built in metrics we can
 compare fire intensity, size, and frequency to. For example, over our
 datasets, the common causes are:''')
 
-st.bar_chart(fire_area[''])
+st.bar_chart(fire_area['FIRE_GENERAL_CAUSE_CODE'])
