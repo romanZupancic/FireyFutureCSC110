@@ -1,0 +1,10 @@
+# The Python Libraries needed to run this project
+
+# Visualization
+streamlit
+pydeck
+
+# Data Processing
+pandas
+numpy
+pillow

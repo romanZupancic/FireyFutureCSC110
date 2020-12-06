@@ -4,7 +4,6 @@ import pandas as pd
 import pydeck as pdk
 import numpy as np
 from PIL import Image
-import altair as alt
 
 # Custom modules
 import assemble_data
@@ -12,8 +11,6 @@ import data_processing
 
 FIRE_POINT = assemble_data.read_fire_disturbance_point()
 FIRE_AREA = assemble_data.read_fire_disturbance_area()
-
-FIRE_POINT_CAUSE = data_processing.fire_point_cause_count(FIRE_POINT)
 
 img = Image.open('forest_fire2.jpg')
 st.image(img, use_column_width=True)
@@ -121,13 +118,38 @@ st.pydeck_chart(pdk.Deck(
     ]
 ))
 
+# st.map(data_processing.read_weather_data())
+
 st.write('''The data sets we aquired have a few built in metrics we can
 compare fire intensity, size, and frequency to. For example, over our
 datasets, the common causes are:''')
 
-st.bar_chart(data=FIRE_POINT_CAUSE)
+st.bar_chart(data=data_processing.fire_cause_count(FIRE_POINT))
 
-cause_alt = alt.Chart(data_processing.fire_area_cause_count(FIRE_AREA)).mark_bar().encode(
-    x='Cause of Fire', y='Occurances in dataset')
+st.bar_chart(data=data_processing.fire_cause_count(FIRE_AREA))
 
-st.altair_chart(cause_alt)
+st.write('''Generally, we see fires started by lightining a considerable
+amount more than any other cause. This might be an interesting factor to
+watch in the event that climate change effects the frequency and intensity of
+lightning strikes: we should see an increase of lightning related fires over
+the years.''') 
+st.write('''Additionaly, we see that human-caused fires
+(recreational, logging, incendiary, etc.) are relatively low in number. Even
+so, the climate still effects the frequency of these types of fires:
+prolonged periods of dry and hot weather can increase the chance of workplace
+and recreational accidents to grow into reported fires. It is evident,
+however, that these fires are not that impactful in the grand scale of
+Ontario's forests: human-caused fires are far more likely to be smaller (and
+end up in the Fire Point database) than other fire causes.''')
+
+st.sidebar.header('Causes over time')
+fire_cause_over_time_values = {key: True for key in data_processing.CAUSE_REFERENCES.keys()}
+
+for cause in fire_cause_over_time_values:
+    fire_cause_over_time_values[cause] = \
+                                st.sidebar.checkbox(data_processing.CAUSE_REFERENCES[cause], True)
+
+st.header('Causes over time')
+enabled_cause_values = [key for key in fire_cause_over_time_values 
+                        if fire_cause_over_time_values[key]]
+st.line_chart(data_processing.fire_cause_over_time(FIRE_AREA, enabled_cause_values))
