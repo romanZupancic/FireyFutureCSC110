@@ -7,26 +7,115 @@ Functions with prefux "read" read csvs into dataframes.
 """
 
 import requests
+import streamlit as st
 import pandas as pd
 import json
 import os
-from typing import List
+from typing import List, Set
 import math
 import datetime
 import statistics
+
+
 DELIMITER = '","'  # Since the government likes microsoft, we have to use weird delimiters
 DATA_DIRECTORY = "./data"
 
-# Input files
-FIRE_AREA_INPUT = f'{DATA_DIRECTORY}/Fire_Disturbance_Area.geojson'
-FIRE_POINT_INPUT = f'{DATA_DIRECTORY}/fire_point.csv'
-WEATHER_DATA_INPUT = f'{DATA_DIRECTORY}/Station Inventory EN.csv'
+# Raw input files (from source)
+FIRE_AREA_RAW = f'{DATA_DIRECTORY}/Fire_Disturbance_Area.geojson'
+FIRE_POINT_RAW = f'{DATA_DIRECTORY}/Fire_Disturbance_Point.csv'
+WEATHER_STATION_RAW = f'{DATA_DIRECTORY}/Station Inventory EN.csv'
 
 # Output files
-FIRE_AREA_OUTPUT =f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Area_Clean.csv'
-FIRE_POINT_OUTPUT = f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Point_Clean.csv'
-WEATHER_STATION_OUT = f'{DATA_DIRECTORY}/processed_data/weather_station_data.csv'
-WEATHER_STATION_LOCATIONS = f'./data/processed_data/weather_station_location_info.csv'
+# Segregated sets
+FIRE_AREA_FILTERED =f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Area_Filtered.csv'
+FIRE_POINT_FILTERED = f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Point_Filtered.csv'
+WEATHER_STATION_OUTPUT = f'{DATA_DIRECTORY}/processed_data/weather_station_data.csv'
+WEATHER_STATION_LOCATIONS = f'{DATA_DIRECTORY}/processed_data/weather_station_location_info.csv'
+
+# Sets of combined data
+FIRE_POINT_WEATHER = f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Point_Weather.csv'
+FIRE_AREA_WEATHER = f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Area_Weather.csv'
+
+# Invalid data removed
+FIRE_POINT_PROCESSED = f'{DATA_DIRECTORY}/training_data/Fire_Disturbance_Point_Processed.csv'
+FIRE_AREA_PROCESSED = f'{DATA_DIRECTORY}/training_data/Fire_Disturbance_Area_Processed.csv'
+NO_FIRE_WEATHER_SEQUENCES = f'{DATA_DIRECTORY}/training_data/No_Fire_Weather_Sequences.csv'
+
+
+def assemble_all_data() -> None:
+    """
+    Assemble all data from just the three source (RAW) input files.
+
+    Requires the files pointed to by the RAW constants to exist in the appropriate directory.
+    """
+    # Early filtering of the data sets
+    make_fire_disturbance_point()
+    make_fire_disturbance_area()
+
+    # Organize weather station metadata and download weather data for individual stations
+    make_individual_weather_data()
+    make_weather_station_locations()
+
+    make_fire_data_with_weather()
+
+    make_processed_fire_weather_data()
+
+
+@st.cache
+def read_fire_disturbance_point() -> pd.DataFrame:
+    """
+    Read the csv containing fire disturbance point data, and return a dataframe
+    representation of its content
+    """
+    fires = pd.read_csv(FIRE_POINT_FILTERED)
+    return fires
+
+
+@st.cache
+def read_fire_disturbance_area() -> pd.DataFrame:
+    """
+    Return a pandas dataframe containing the data read from the fire disturbance area csv
+    """
+    fires = pd.read_csv(FIRE_AREA_FILTERED)
+    return fires
+
+
+@st.cache
+def read_weather_station_data() -> pd.DataFrame:
+    """
+    Read the weather station data from the csv, and return it as a pandas DataFrame
+    """
+    data = pd.read_csv(WEATHER_STATION_OUTPUT)
+    return data
+
+
+@st.cache
+def read_fire_disturbance_point_processed() -> pd.DataFrame:
+    """
+    Read the csv containing fire disturbance point data, and return a dataframe
+    representation of its content
+    """
+    fires = pd.read_csv(FIRE_POINT_PROCESSED)
+    return fires
+
+
+@st.cache
+def read_fire_disturbance_area_processed() -> pd.DataFrame:
+    """
+    Return a pandas dataframe containing the data read from the fire disturbance area csv
+    """
+    fires = pd.read_csv(FIRE_AREA_PROCESSED)
+    return fires
+
+
+@st.cache
+def read_weather_station_data() -> pd.DataFrame:
+    """
+    Read the weather station data from the csv, and return it as a pandas DataFrame
+    """
+    data = pd.read_csv(NO_FIRE_WEATHER_SEQUENCES)
+    return data
+
 
 def assemble_fire_disturbance_point() -> pd.DataFrame:
     """
@@ -36,14 +125,16 @@ def assemble_fire_disturbance_point() -> pd.DataFrame:
     The return value of this function is stored at:
     ./data/Fire_Disturbance_Point_Clean.csv
     """
-    fires = pd.read_csv(FIRE_POINT_INPUT)
-    fires = fires.rename(columns={'X': 'longitude', 'Y': 'latitude'})
+    fires = pd.read_csv(FIRE_POINT_RAW)  # Get the raw data file
+    fires = fires.rename(columns={'X': 'LONGITUDE', 'Y': 'LATITUDE'})
     remove_indicies = []
+    # Filter out data based on the year it was collected for
     for row, item in fires.iterrows():
         print(row)
         if int(item['FIRE_START_DATE'].split('/')[0]) < 1998:
             remove_indicies.append(row)
     print('remove indicies')
+    # Drop everything at once
     for row in remove_indicies:
         print(row)
         fires = fires.drop(row)
@@ -56,16 +147,7 @@ def make_fire_disturbance_point() -> None:
     """
     print('Saving Data')
     data = assemble_fire_disturbance_point()
-    data.to_csv(FIRE_POINT_OUTPUT)
-
-
-def read_fire_disturbance_point() -> pd.DataFrame:
-    """
-    Read the csv containing fire disturbance point data, and return a dataframe
-    representation of its content
-    """
-    fires = pd.read_csv(FIRE_POINT_OUTPUT)
-    return fires
+    data.to_csv(FIRE_POINT_FILTERED)
 
 
 def assemble_fire_disturbance_area() -> pd.DataFrame:
@@ -78,7 +160,7 @@ def assemble_fire_disturbance_area() -> pd.DataFrame:
     as caculates the approximate location of a given area fire by averaging it's shape.
     """
     # Open the file
-    with open(FIRE_AREA_INPUT) as json_file:
+    with open(FIRE_AREA_RAW) as json_file:
         data = json.load(json_file)
 
         properties_so_far = []
@@ -87,11 +169,10 @@ def assemble_fire_disturbance_area() -> pd.DataFrame:
         for row in data['features']:
             if int(row['properties']['FIRE_START_DATE'].split('/')[0]) >= 1998:
                 properties = [row['properties']['OGF_ID'],
-                          row['properties']['FIRE_TYPE_CODE'],
-                          row['properties']['FIRE_START_DATE'],
-                          row['properties']['FIRE_GENERAL_CAUSE_CODE'],
-                          row['properties']['FIRE_FINAL_SIZE']
-                          ]
+                              row['properties']['FIRE_START_DATE'],
+                              row['properties']['FIRE_GENERAL_CAUSE_CODE'],
+                              row['properties']['FIRE_FINAL_SIZE']
+                              ]
 
                 # Analyse and retrieve the shape of the fire
                 if row['geometry']['type'] == 'MultiPolygon':
@@ -123,21 +204,13 @@ def assemble_fire_disturbance_area() -> pd.DataFrame:
         return pd.DataFrame(properties_so_far, columns = columnLabels)
 
 
-def make_fire_disturbance_area_csv() -> None:
+def make_fire_disturbance_area() -> None:
     """
     Assemble and save fire disturbance area data to a csv (makes for faster loading in the
     future)
     """
     data = assemble_fire_disturbance_area()
-    data.to_csv(FIRE_AREA_OUTPUT)
-
-
-def read_fire_disturbance_area() -> pd.DataFrame:
-    """
-    Return a pandas dataframe containing the data read from the fire disturbance area csv
-    """
-    fires = pd.read_csv(FIRE_AREA_OUTPUT)
-    return fires
+    data.to_csv(FIRE_AREA_FILTERED)
 
 
 #  Assemble the weather data
@@ -145,10 +218,12 @@ def filter_stations(min_year: int) -> pd.DataFrame:
     """
     Return the rows of all weather stations that operate throughout years min_year and 2020
     """
-    unfiltered = pd.read_csv(WEATHER_DATA_INPUT, header=[2])
+    unfiltered = pd.read_csv(WEATHER_STATION_RAW, header=[2])
 
+    # Filter data based on year collected for
     filtered_first_year = unfiltered[unfiltered['First Year'] <= min_year]
     filtered_last_year = filtered_first_year[unfiltered['Last Year'] == 2020]
+    #Only look for Ontario data
     filtered_province = filtered_last_year[filtered_last_year['Province'] == 'ONTARIO']
     return filtered_province
 
@@ -192,11 +267,14 @@ def make_individual_weather_data(year: int = 1998) -> None:
     """
     stations = filter_stations(year) # Get eligable stations
 
+    # For every station that is eligable, get the weather data associated for that station
+    # Within the tarket period (from year to present)
     for _, station in stations.iterrows():
         print(station)
         data = assemble_weather_data_by_station(station['Station ID'],
                                                 year, station['Last Year'])
 
+        # Export an individual station to CSV
         data.to_csv(f'{DATA_DIRECTORY}/weather_data/{station["Name"]}_{station["Station ID"]}.csv')
 
 
@@ -206,18 +284,12 @@ def make_weather_station_data() -> None:
     Requires the existance of individual station data in {DATA_DIRECTORY}/weather_data/ in
     the form of csv's.
     """
+    # Gather all the data into one list
     data_frames = [pd.read_csv(f'{DATA_DIRECTORY}/weather_data/{file}')
                    for file in os.listdir(f'{DATA_DIRECTORY}/weather_data/') if '.csv' in file]
 
-    pd.concat(data_frames).to_csv(WEATHER_STATION_OUT)
-
-
-def read_weather_station_data() -> pd.DataFrame:
-    """
-    Read the weather station data from the csv, and return it as a pandas DataFrame
-    """
-    data = pd.read_csv(WEATHER_STATION_OUT)
-    return data
+    # This file is actually too big for Github, so we mostly use the individual files
+    pd.concat(data_frames).to_csv(WEATHER_STATION_OUTPUT)
 
 
 def assemble_weather_station_locations() -> pd.DataFrame:
@@ -225,14 +297,15 @@ def assemble_weather_station_locations() -> pd.DataFrame:
     Return a dataframe of the location of weather stations, by name.
     """
     coordinates = []
-    for file in os.listdir('./data/weather_data'):
-        df = pd.read_csv('./data/weather_data/' + file)
-        long = set(df['Longitude (x)'])
-        lat = set(df['Latitude (y)'])        
+    # Iterate through all the weather station csvs
+    for file in os.listdir(f'{DATA_DIRECTORY}/weather_data'):
+        df = pd.read_csv(f'{DATA_DIRECTORY}/weather_data/' + file)
+        long = set(df['Longitude (x)'])  # Extract longitude data
+        lat = set(df['Latitude (y)'])  # Extract latitude data
         coordinates.append([file, list(lat)[0], list(long)[0]])
     final_coordinates = pd.DataFrame(coordinates, columns=['name', 'lat', 'lon'])
     return final_coordinates
-    
+
 
 def make_weather_station_locations() -> None:
     """
@@ -242,64 +315,97 @@ def make_weather_station_locations() -> None:
     data.to_csv(WEATHER_STATION_LOCATIONS)
 
 
-def make_fire_point_with_weather():
-    fire_point_data = read_fire_disturbance_point()
-    fire_point_data = fire_point_data.iloc[:15]
-    temperature_list = []
-    precipitation_list = []
-    stations_list = []
-    for _, row in fire_point_data.iterrows():
+def assemble_fire_data_with_weather(fire_dataset: pd.DataFrame) -> pd.DataFrame:
+    """
+    Return one dataframe with each fire location and the associated weather data in
+    its area. This prevents us from haveing to make multiple lookups whenever we want weather
+    data.
+    """
+    fire_data = fire_dataset.copy()
+    #fire_data = fire_data.iloc[:15]  # For debugging
+    temperature_list = []  # Accumulator
+    precipitation_list = []  # Accumulator
+    stations_list = []  # Accumulator
+    for idx, row in fire_data.iterrows():
         date = row['FIRE_START_DATE']
-        lat = row['latitude']
-        lon = row['longitude']
+        lat = row['LATITUDE']
+        lon = row['LONGITUDE']
         temp, precip, station = get_closest_weather_data(date, lon, lat)
         temperature_list.append(temp)
         precipitation_list.append(precip)
-        stations_list.append(station)    
-    fire_point_data['WEATHER_STATION_PATH'] = stations_list
-    fire_point_data['TEMPERATURE'] = temperature_list
-    fire_point_data['PRECIPITATION'] = precipitation_list
-    print(fire_point_data)
-    
+        stations_list.append(station)
+        print(idx)
+    fire_data['WEATHER_STATION_PATH'] = stations_list
+    fire_data['TEMPERATURE'] = temperature_list
+    fire_data['PRECIPITATION'] = precipitation_list
+
+    return fire_data
+
+
+def make_fire_data_with_weather() -> None:
+    """
+    Save both the point and area fire data csvs with their weather information
+    """
+    fire_point_data = assemble_fire_data_with_weather(read_fire_disturbance_point())
+    fire_point_data.to_csv(FIRE_POINT_WEATHER)
+    fire_area_data = assemble_fire_data_with_weather(read_fire_disturbance_area())
+    fire_area_data.to_csv(FIRE_AREA_WEATHER)
+
 
 def get_closest_weather_data(date: str, lon: float, lat: float) -> List[str]:
     """
-    Get the weather station data from the closest station to the given longitude and latitude
-    coordinates
+    Return the weather station data from the closest station to the given longitude and latitude
+    coordinates.
+
+    The return list is a string of temperatures, a string of precipitations, and the file path
+    of the weather station.
     """
     station_file_path = choose_closest_station(lon, lat)
-    station = pd.read_csv('./data/weather_data/' + station_file_path)
+    station = pd.read_csv(f'{DATA_DIRECTORY}/weather_data/' + station_file_path)
     fire_date = date.split(' ')[0].split('/')
-    fire_date = datetime.datetime(year=int(fire_date[0]), month=int(fire_date[1]), day=int(fire_date[2]))
+    # fire_date = datetime.datetime(year=int(fire_date[0]), month=int(fire_date[1]), day=int(fire_date[2]))
 
-    date_index = 0
-    for row, data in station.iterrows():
-        # print(int(data['Year']))
-        # print(int(data['Month']))
-        # print(int(data['Day']))
-        current_date = datetime.datetime(year=int(data['Year']), month=int(data['Month']), day=int(data['Day']))
-        
-        if current_date > fire_date:
-            date_index = row
-            break
-    weather_data = station.iloc[date_index - 21: date_index]    
+    # date_index = 0
+    # for row, data in station.iterrows():
+    #     # print(int(data['Year']))
+    #     # print(int(data['Month']))
+    #     # print(int(data['Day']))
+    #     current_date = datetime.datetime(year=int(data['Year']), month=int(data['Month']), day=int(data['Day']))
+
+    #     if current_date >= fire_date:
+    #         date_index = row
+    #         break
+
+    # Format the date into a string that matches the csv
+    fire_date = f'{fire_date[0]}-{fire_date[1]}-{fire_date[2]}'
+
+    # Get the index of the data on the target date
+    date_index = station.index[station['Date/Time'] == fire_date].tolist()[0]
+
+    # Get the data on the date in question
+    weather_data = station.iloc[date_index - 21: date_index]
     precipitation = list(weather_data['Total Precip (mm)'])
     temperature = list(weather_data['Max Temp (°C)'])
 
+    # Remove invalid data (Nan data)
+    temperature = remove_nan_weather(temperature)
+    precipitation = remove_nan_weather(precipitation)
 
+    # Format the data into strings
     temperature_str = ','.join([str(x) for x in temperature])
     precipitation_str = ','.join([str(x) for x in precipitation])
 
     return [temperature_str, precipitation_str, station_file_path]
-        
+
 
 def choose_closest_station(lon: float, lat: float) -> str:
     """
-    Return the file path for the closest weather station to the given longitude and latitude 
+    Return the file path for the closest weather station to the given longitude and latitude
     coordinates
     """
-    possible_weather_stations = pd.read_csv('./data/processed_data/weather_station_location_info.csv')
-    min_dist = [10000000000000000000, []]
+    possible_weather_stations = pd.read_csv(WEATHER_STATION_LOCATIONS)
+    # Initialize accumulator variable
+    min_dist = [10000000000000000000, []]  # An impossible large number and an empty list
     for _, station in possible_weather_stations.iterrows():
         distance = get_distance([station['lon'], station['lat']], [lon, lat])
         if distance < min_dist[0]:
@@ -316,27 +422,148 @@ def get_distance(station: List[float], fire: List[float]) -> float:
 
     latitude_discrepancy = math.radians(station[1] - fire[1])
     longitude_discrepancy = math.radians(station[0] - fire[0])
-    
+
+    # This formula was given by Tutorial 11
     angle = 2 * math.asin(math.sqrt(math.sin(latitude_discrepancy / 2) ** 2 +
                           math.cos(math.radians(station[1])) * math.cos(math.radians(fire[1])) *
                           math.sin(longitude_discrepancy) ** 2))
     return angle * radius
 
 
-def remove_nan_weather(weather: List[int]) -> List:
+def remove_nan_weather(weather_input: List[int]) -> List:
     """Remove nan values and replace them with the average value of the sequence"""
+    weather = weather_input.copy()
     non_nan = []
-    for i in range(len(temperature)):
-        if math.isnan(temperature[i]) == False:
-            non_nan.append(temperature[i])
+    for i in range(len(weather)):
+        try:
+            if math.isnan(weather[i]) == False:
+                non_nan.append(weather[i])
+        except:
+            # The data file contains an invalid character ("M")
+            pass
     if (len(non_nan) < 14):
-        temperature == 'INVALID'
+        weather = ['INVALID']  # Rewrite the weather data with a more clear indicator
     else:
         avg_temp = statistics.mean(non_nan)
-        for i in range(len(temperature)):
-            if math.isnan(temperature[i]) == True:
-                temperature[i] = avg_temp
+        for i in range(len(weather)):
+            try:
+                if math.isnan(weather[i]) == True:
+                    weather[i] = avg_temp
+            except:
+                if type(weather[i]) == str:
+                    weather[i] = avg_temp
+    return weather
 
+
+def assemble_processed_fire_weather_data(input_path: str) -> pd.DataFrame:
+    """
+    Remove all rows from the input path that contain
+    INVALID values for temperature or precipitation
+    """
+    fires = pd.read_csv(input_path)
+    fires = fires.drop(index=fires.index[fires['TEMPERATURE'] == 'INVALID'])
+    fires = fires.drop(index=fires.index[fires['PRECIPITATION'] == 'INVALID'])
+    return fires
+
+
+def make_processed_fire_weather_data() -> None:
+    """
+    Produces two csv's (for point and area data) that contains all fires with legitament weather
+    information (without INVALID entries).
+    """
+    processed_point = assemble_processed_fire_weather_data(FIRE_POINT_WEATHER)
+    processed_point.to_csv('./data/training_data/Fire_Disturbance_Point_Processed.csv')
+
+    processed_area = assemble_processed_fire_weather_data(FIRE_AREA_WEATHER)
+    processed_area.to_csv('./data/training_data/Fire_Disturbance_Area_Processed.csv')
+
+
+# def remove_invalid_from_fire_point() -> None:
+#     """Remove all rows from fire point data that contain INVALID values for temperature or precipitation"""
+#     fires = pd.read_csv(FIRE_POINT_WEATHER)
+#     fires = fires.drop(index=fires.index[fires['TEMPERATURE'] == 'INVALID'])
+#     fires = fires.drop(index=fires.index[fires['PRECIPITATION'] == 'INVALID'])
+#     fires.to_csv('./data/training_data/Fire_Disturbance_Point_Processed.csv')
+
+
+# def remove_invalid_from_fire_area() -> None:
+#     """Remove all rows from fire point data that contain INVALID values for temperature or precipitation"""
+#     fires = pd.read_csv(FIRE_AREA_WEATHER)
+#     fires = fires.drop(index=fires.index[fires['TEMPERATURE'] == 'INVALID'])
+#     fires = fires.drop(index=fires.index[fires['PRECIPITATION'] == 'INVALID'])
+#     fires.to_csv('./data/training_data/Fire_Disturbance_Area_Processed.csv')
+
+
+def get_used_weather_files(fire_point, fire_area) -> Set[str]:
+    """
+    Return a set of all the weather stations that we used to get weather data for each of the fires
+    """
+    used_stations = set.union(set(fire_point['WEATHER_STATION_PATH']),
+                              set(fire_area['WEATHER_STATION_PATH']))
+    return used_stations
+
+
+def create_no_fire_weather_data() -> None:
+    """
+    Get a dataset containing sequences of weather data which did not result in there being a fire
+    """
+    no_fire_weather_df = pd.DataFrame(columns=['TEMPERATURE', 'PRECIPITATION'])
+    fire_point = pd.read_csv(FIRE_POINT_PROCESSED)
+    fire_area = pd.read_csv(FIRE_AREA_PROCESSED)
+    used_stations = get_used_weather_files(fire_point, fire_area)
+    for station in list(used_stations):
+        # if station != 'CARIBOU ISLAND (AUT)_7582.csv':
+        print(station)
+        fire_point_days = fire_point.loc[fire_point['WEATHER_STATION_PATH'] == station]
+        fire_area_days = fire_area.loc[fire_area['WEATHER_STATION_PATH'] == station]
+        fire_point_days = fire_point_days['FIRE_START_DATE']
+        fire_area_days = fire_area_days['FIRE_START_DATE']
+        fire_days = set.union(set(fire_point_days), set(fire_area_days))
+        print(len(fire_days))
+        no_fire_weather_df = pd.concat([no_fire_weather_df, get_no_fire_weather_sequences(fire_days, station)])
+    no_fire_weather_df.to_csv(NO_FIRE_WEATHER_SEQUENCES)
+
+
+def get_no_fire_weather_sequences(fire_days, station_path) -> List:
+    """Create a csv file containing 21 day sequences of weather data in which a fire did not occur at the end of the 21 days"""
+    weather_sequences = []
+    weather_data = pd.read_csv('./data/weather_data/' + station_path)
+    weather_data = weather_data.reset_index()
+    index_list = []
+    for day in fire_days:
+        date = day.split(' ')[0]
+        date = date.replace('/', '-')
+        index_list.append(weather_data.index[weather_data['Date/Time'] == date][0])
+    list.sort(index_list)
+    valid_indices = []
+    for i in range(0, len(index_list) - 1):
+        if index_list[i + 1] - index_list[i] > 28:
+            valid_indices.append([index_list[i] + 3, index_list[i + 1] - 3])
+    for pair in valid_indices:
+        weather_interval = weather_data.iloc[pair[0]:pair[1]]
+        temp_list = list(weather_interval['Max Temp (°C)'])
+        precip_list = list(weather_interval['Total Precip (mm)'])
+        precip_list = remove_nan_weather(precip_list)
+        for i in range(len(temp_list) - 20):
+            #print(station_path)
+            temperature = remove_nan_weather(temp_list[i:i+21])
+            precipitation = remove_nan_weather(precip_list[i:i+21])
+            if temperature != ['INVALID'] and precipitation != ['INVALID']:
+                temperature = to_list_of_str(temperature)
+                precipitation = to_list_of_str(precipitation)
+                weather_sequences.append([','.join(temperature), ','.join(precipitation)])
+    return pd.DataFrame(weather_sequences, columns=['TEMPERATURE', 'PRECIPITATION'])
+
+
+def to_list_of_str(lst: List) -> List[str]:
+    """
+    Take in a list of int or floats and return a list containing
+    string representations of the floats or ints
+    """
+    new_lst = []
+    for value in lst:
+        new_lst.append(str(value))
+    return new_lst
 
 
 if __name__ == '__main__':

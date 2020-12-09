@@ -1,3 +1,11 @@
+"""
+The main file of our project. This calls all the code that is required for our app to function,
+as long as the datasets have already been built.
+
+Most of this file is streamlit function calls, because that is the interface that
+our app uses to display the data. Other functions (data retrival and processing) functions
+are also called in this file, and, most of the time, passed on to streamlit.
+"""
 # Third-party modules
 import streamlit as st
 import pandas as pd
@@ -10,12 +18,12 @@ import assemble_data
 import data_processing
 
 FIRE_POINT = assemble_data.read_fire_disturbance_point()
+# FIRE_POINT2 = assemble_data.read_fire_disturbance_point2()
 FIRE_AREA = assemble_data.read_fire_disturbance_area()
 
 img = Image.open('forest_fire2.jpg')
 st.image(img, use_column_width=True)
 st.title('Abstract')
-
 st.write('''Forest fires have always posed a major threat to Canadian forests.
         The National Forestry database estimates that Canada endures on average
         8000 forest fires per year, which burn through 2.1 million acres of
@@ -38,6 +46,7 @@ st.write('''Forest fires have always posed a major threat to Canadian forests.
 
 st.title('Preliminary Data Analysis')
 
+st.header('Forest Fire Locations Since 1998')
 st.write('''The following map displays data for fires in ontario between 1998
 to 2020 that are under 40 hectares in size. Areas in red are where fires are
 more likely to occur. These fires are more likely to occur in the
@@ -56,31 +65,33 @@ st.pydeck_chart(pdk.Deck(
             "HeatmapLayer",
             data=FIRE_POINT,
             opacity=0.3,
-            get_position='[longitude, latitude]'
+            get_position='[LONGITUDE, LATITUDE]'
         )
-        #  pdk.Layer(
-        #     'HexagonLayer',
-        #     data=map_data.fires,
-        #     radius=8000,
-        #     get_position='[longitude, latitude]',
-        #     elevation_scale=30,
-        #     elevation_range=[0, 1000],
-        #     extruded=True
-        #  ),
-        # pdk.Layer(
-        #     "ContourLayer",
-        #     data=map_data.fires,
-        #     get_position='[longitude, latitude]',
-        #     cell_size=8000
-
-        # )
     ]
 ))
 
+# st.pydeck_chart(pdk.Deck(
+#     map_style='mapbox://styles/mapbox/light-v9',
+#     initial_view_state=pdk.ViewState(
+#         latitude=50,
+#         longitude=-86,
+#         zoom=4,
+#         pitch=30
+#     ),
+#     layers=[
+#         pdk.Layer(
+#             "HeatmapLayer",
+#             data=FIRE_POINT2,
+#             opacity=0.3,
+#             get_position='[LONGITUDE, LATITUDE]'
+#         )
+#     ]
+# ))
+
 st.write('''The following map displays the location of forest fires in
 Ontario from 1998 to 2020 that were greater than 40 hectares in size. Areas
-highlighted in red indicate areas where these fires most frequently occur. 
-The importance of separating fires by size is clearly illustrated by the 
+highlighted in red indicate areas where these fires most frequently occur.
+The importance of separating fires by size is clearly illustrated by the
 discrepancy between the two maps. In the map bellow, we can see that larger forest
 fires tend to occur in the north western region of Ontario, while the map above
 shows that smaller fires most often occur further south.''')
@@ -99,32 +110,19 @@ st.pydeck_chart(pdk.Deck(
             opacity=0.3,
             get_position='[LONGITUDE, LATITUDE]'
         )
-        #  pdk.Layer(
-        #     'HexagonLayer',
-        #     data=map_data.fires,
-        #     radius=8000,
-        #     get_position='[longitude, latitude]',
-        #     elevation_scale=30,
-        #     elevation_range=[0, 1000],
-        #     extruded=True
-        #  ),
-        # pdk.Layer(
-        #     "ContourLayer",
-        #     data=map_data.fires,
-        #     get_position='[longitude, latitude]',
-        #     cell_size=8000
-
-        # )
     ]
 ))
 
 # st.map(data_processing.read_weather_data())
 
+st.header('Fire Causes Since 1998')
 st.write('''The data sets we aquired have a few built in metrics we can
-compare fire intensity, size, and frequency to. For example, over our
-datasets, the common causes are:''')
+compare fire intensity, size, and frequency to. For example, over
+the Fire Disturbance Point dataset, we have:''')
 
 st.bar_chart(data=data_processing.fire_cause_count(FIRE_POINT))
+
+st.write('''And over the Fire Disturbance Area dataset, we have:''')
 
 st.bar_chart(data=data_processing.fire_cause_count(FIRE_AREA))
 
@@ -132,7 +130,8 @@ st.write('''Generally, we see fires started by lightining a considerable
 amount more than any other cause. This might be an interesting factor to
 watch in the event that climate change effects the frequency and intensity of
 lightning strikes: we should see an increase of lightning related fires over
-the years.''') 
+the years.''')
+
 st.write('''Additionaly, we see that human-caused fires
 (recreational, logging, incendiary, etc.) are relatively low in number. Even
 so, the climate still effects the frequency of these types of fires:
@@ -142,14 +141,38 @@ however, that these fires are not that impactful in the grand scale of
 Ontario's forests: human-caused fires are far more likely to be smaller (and
 end up in the Fire Point database) than other fire causes.''')
 
-st.sidebar.header('Causes over time')
+st.sidebar.title('Causes over time')
+st.sidebar.header('Fire causes')
 fire_cause_over_time_values = {key: True for key in data_processing.CAUSE_REFERENCES.keys()}
 
 for cause in fire_cause_over_time_values:
     fire_cause_over_time_values[cause] = \
                                 st.sidebar.checkbox(data_processing.CAUSE_REFERENCES[cause], True)
+st.sidebar.header('Timescale')
+cause_timescale = st.sidebar.select_slider('Timescale', ['Year', 'Month', 'Day'], 'Month')
 
 st.header('Causes over time')
-enabled_cause_values = [key for key in fire_cause_over_time_values 
+st.write('''The following graph displays the number of Fire Disturbance Point
+causes over time. What data is displayed, and over what timescales, can be
+configured in the side bar.''')
+
+enabled_cause_values = [key for key in fire_cause_over_time_values
                         if fire_cause_over_time_values[key]]
-st.line_chart(data_processing.fire_cause_over_time(FIRE_AREA, enabled_cause_values))
+st.line_chart(data_processing.fire_cause_over_time(FIRE_POINT, enabled_cause_values,
+                                                   cause_timescale))
+st.write('And over the Fire Disturbance Area dataset:')
+st.line_chart(data_processing.fire_cause_over_time(FIRE_AREA, enabled_cause_values,
+                                                   cause_timescale))
+
+st.write('''It is important to note the difference in scale between the two
+datasets (where the point dataset is about 10 - 15 times bigger than the area
+dataset). It is also helpful to examine the data together. For example, the
+peaks and troughs between the two sets are nearly identical for lightning
+causes on the yearly scale, but the similarities begin to break down as we
+consider other causes (E.g miscellaneous on the yearly scale has an entirely different
+shape on each of the graphs). Some of the variation in data, and perhaps why some of the
+other causes diverge in similarities, could be because of the lack of data in the Fire
+Disturbance Area dataset - perhaps not because the set is missing fires, but that the fires
+do not occur as regularly, as they are bigger. With less data, the causes attributed to
+the Fire Disturbance Area dataset have less room to "smooth" out: a change of 5-to-4 seems much
+greater than a change of 123-to-128.''')
