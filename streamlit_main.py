@@ -12,14 +12,46 @@ import pandas as pd
 import pydeck as pdk
 import numpy as np
 from PIL import Image
+import plotly.express as px
+import plotly.graph_objects as go
+
+import logging
+
+import time
 
 # Custom modules
 import assemble_data
 import data_processing
 
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s: %(message)s')
+
+logging.info('---Start of file---')
+
 FIRE_POINT = assemble_data.read_fire_disturbance_point()
-# FIRE_POINT2 = assemble_data.read_fire_disturbance_point2()
 FIRE_AREA = assemble_data.read_fire_disturbance_area()
+
+FIRE_POINT_PROCESSED = assemble_data.read_fire_disturbance_point_processed()
+FIRE_AREA_PROCESSED = assemble_data.read_fire_disturbance_area_processed()
+
+NO_FIRE_WEATHER_SEQUENCES = assemble_data.read_no_fire_weather_sequences()
+
+
+def generate_regressive_plot(data: data_processing.WeatherAreaRegression, 
+                             x: str, y: str, title: str) -> go.Figure():
+    figure = go.Figure()
+    figure.add_trace(go.Scatter(x=data.data[x], y=data.data[y], mode='markers', name='Data'))
+    linear_x = [data.data[x].min(), data.data[x].max()]
+    linear_y = [data_processing.evaluate_linear_equation(data.regressions[x][0], 
+                                                         data.regressions[x][1], linear_x[0]),
+                data_processing.evaluate_linear_equation(data.regressions[x][0], 
+                                                         data.regressions[x][1], linear_x[1])]
+    figure.add_trace(go.Scatter(x=linear_x, y=linear_y, mode='lines', name='Regression Line'))
+    figure.update_layout(title=title, xaxis_title=x, yaxis_title=y)
+
+    return figure
+
+
+logging.info('Starting UI')
 
 img = Image.open('forest_fire2.jpg')
 st.image(img, use_column_width=True)
@@ -45,6 +77,8 @@ st.write('''Forest fires have always posed a major threat to Canadian forests.
         have affected the number and size of forest fires in Ontario.''')
 
 st.title('Preliminary Data Analysis')
+
+logging.info('Presenting maps')
 
 st.header('Forest Fire Locations Since 1998')
 st.write('''The following map displays data for fires in ontario between 1998
@@ -115,6 +149,8 @@ st.pydeck_chart(pdk.Deck(
 
 # st.map(data_processing.read_weather_data())
 
+logging.info('Calculating Fire Causes')
+
 st.header('Fire Causes Since 1998')
 st.write('''The data sets we aquired have a few built in metrics we can
 compare fire intensity, size, and frequency to. For example, over
@@ -140,6 +176,8 @@ and recreational accidents to grow into reported fires. It is evident,
 however, that these fires are not that impactful in the grand scale of
 Ontario's forests: human-caused fires are far more likely to be smaller (and
 end up in the Fire Point database) than other fire causes.''')
+
+logging.info('Calculating Causes over time')
 
 st.sidebar.title('Causes over time')
 st.sidebar.header('Fire causes')
@@ -176,3 +214,102 @@ Disturbance Area dataset - perhaps not because the set is missing fires, but tha
 do not occur as regularly, as they are bigger. With less data, the causes attributed to
 the Fire Disturbance Area dataset have less room to "smooth" out: a change of 5-to-4 seems much
 greater than a change of 123-to-128.''')
+
+logging.info('Calculating Weather and Fire severity')
+
+st.sidebar.title('Weather and fire severity')
+maximum_area = st.sidebar.slider('Maximum fire area burned', 0, 150000, 150000)
+
+st.header('''Weather and fire severity''')
+st.write('''The following graphs display the correlation between Average temperatures and 
+         average precipitations in the 21 days before a fire occured.''')
+# Area
+weather_v_area_area = data_processing.area_burned_vs_weather(FIRE_AREA_PROCESSED, maximum_area)
+# st.plotly_chart(px.scatter(weather_v_area_area, x='TEMPERATURE', y='AREA BURNED', 
+#                            title='Fire Disturbance Area: Temperature v. Area Burned'))
+# temperature_v_area_area = go.Figure()
+# temperature_v_area_area.add_trace(go.Scatter(x=weather_v_area_area[0]['TEMPERATURE'],
+#                                              y=weather_v_area_area[0]['AREA BURNED'],
+#                                              mode='markers'))
+# temperature_v_area_area.add_trace(go.Scatter(x=[0, weather_v_area_area[0]['TEMPERATURE'].iloc([-1])],
+#                                              y=[weather_v_area_area[1][0], 
+#                                                 data_processing.evaluate_linear_equation(weather_v_area_area[1][0], weather_v_area_area[1][1], weather_v_area_area[0]['TEMPERATURE'].iloc([-1]))],
+#                                              mode='lines'))
+# temperature_v_area_area.update_layout(title='Fire Disturbance Area: Temperature v. Area Burned',
+#                                       xaxis_title='TEMPERATURE',
+#                                       yaxis_title='AREA BURNED')
+temperature_v_area_area = generate_regressive_plot(weather_v_area_area, 
+                                                   'TEMPERATURE', 
+                                                   'AREA BURNED',
+                                                   'Fire Disturbance Area: Temperature v. Area Burned')
+st.plotly_chart(temperature_v_area_area)
+st.write('''One of the most important takeaways from this visualization is 
+         that fires have the potential to grow large at higher temperatures
+         than at lower temperatures. This is evident with just the base graph
+         (displaying a maximum area of 150000 hectares), where the highest
+         points (indicating the most area burned) were at the farther end of
+         the graph (indicating higher temperatures). The trend continues as
+         we "zoom in" to the graph, where higher points are always more
+         frequent with larger temperatures. The density of the points is also
+         an indicator of the frequency of fires. While at temperatures of 0
+         degrees celcius to (at the very least) 10 degrees celcius see few
+         fires, temperatures from 15 degrees celcius onward sees a far
+         greater concentration.''')
+
+st.plotly_chart(px.scatter(weather_v_area_area, x='PRECIPITATION', y='AREA BURNED', 
+                           title='Fire Disturbance Area: Precipitation v. Area Burned'))
+st.write('''This graph shows the negative correlation between precipitation
+and area burned: where higher precipitation results in weaker and less
+frequent fires. ''')
+
+st.plotly_chart(px.scatter_3d(weather_v_area_area, z='PRECIPITATION', y='AREA BURNED',
+                              x='TEMPERATURE', height=800,
+                              title='Fire Disturbance Area: Precipitation v. Area Burned ' + \
+                              'v. Precipitation'))
+st.write('''Finally, we have a 3D graph plotting temperature, precipitation, and fire area burned
+         on 3 separate axis. It (unsurprisingly) seems that fires tend to spread the farthest 
+         under low precipitations and high temperatures. However, the opposite is not true: 
+         just because a fire happens under dry and hot conditions does not mean it will grow
+         very large: hence, the large blob of datapoints at the lower ends of the temperature and
+         precipitation axis.''')
+st.write('''It also seems that precipitation has a much larger effect on fire frequency and
+         strength than weather does: there is a far narrower range of large fires on the precipitation
+         axis than on the temperature axis.''')
+
+# Point
+weather_v_area_point = data_processing.area_burned_vs_weather(FIRE_POINT_PROCESSED, 
+                                                                     10000)[0]
+st.plotly_chart(px.scatter(weather_v_area_point, x='TEMPERATURE', y='AREA BURNED', 
+                           title='Fire Disturbance Point: Temperature v. Area Burned'))
+
+st.plotly_chart(px.scatter(weather_v_area_point, x='PRECIPITATION', y='AREA BURNED', 
+                           title='Fire Disturbance Point: Precipitation v. Area Burned'))
+
+st.plotly_chart(px.scatter_3d(weather_v_area_point, z='PRECIPITATION', y='AREA BURNED',
+                              x='TEMPERATURE', height=800,
+                              title='Fire Disturbance Point: Precipitation v. Area Burned ' + \
+                              'v. Precipitation'))
+
+logging.info('Calculating precipitation and temperature correlations')
+
+st.title('Data Modelling Part 1:')
+st.write("""The primary goal of this project is to identify how climate change has affected the frequency of forest fires in Ontario,
+            and predict how it might affect forest fires in the future. In our preliminary data analysis, we concluded that we do not
+            have sufficient evidence to prove that climate change has affected forest fires in Ontario. We showed that the fires dataset only
+            includes the fires which occured from 1998 to 2020, and over this time period there was no tangible change in the frequency of
+            forest fires. However, this result does not proclude us from further investigating how climate change might affect forest fires
+            in the future. We have assembled a dataset containing approaximately thirty-thousand 21 day sequences of max temperature and precipitation
+            data, and an indicator which designates whether or not a fire occured after the day following that 21 day sequence.""")
+st.header('Correlations between temperature and precipitation')
+fire_point_temp_v_weather = data_processing.graph_weather(FIRE_POINT_PROCESSED)
+no_fire_temp_v_weather = data_processing.graph_weather(NO_FIRE_WEATHER_SEQUENCES)
+
+precipitation_vs_temperature = px.density_heatmap(fire_point_temp_v_weather, x='TEMPERATURE', y='PRECIPITATION', nbinsx=30, nbinsy=30, marginal_x='histogram', marginal_y='histogram')
+precipitation_vs_temperature_no_fire = px.density_heatmap(no_fire_temp_v_weather, x='TEMPERATURE', y='PRECIPITATION', nbinsx=30, nbinsy=30, marginal_x='histogram', marginal_y='histogram')
+# precipitation_vs_temperature = px.scatter(fire_point_temp_v_weather, x='TEMPERATURE', y='PRECIPITATION')
+# precipitation_vs_temperature_no_fire = px.scatter(no_fire_temp_v_weather, x='TEMPERATURE', y='PRECIPITATION')
+st.plotly_chart(precipitation_vs_temperature)
+st.write('No Fire')
+st.plotly_chart(precipitation_vs_temperature_no_fire)
+
+logging.info('---End of file---')

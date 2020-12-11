@@ -40,6 +40,7 @@ FIRE_AREA_WEATHER = f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Area_Weat
 FIRE_POINT_PROCESSED = f'{DATA_DIRECTORY}/training_data/Fire_Disturbance_Point_Processed.csv'
 FIRE_AREA_PROCESSED = f'{DATA_DIRECTORY}/training_data/Fire_Disturbance_Area_Processed.csv'
 NO_FIRE_WEATHER_SEQUENCES = f'{DATA_DIRECTORY}/training_data/No_Fire_Weather_Sequences.csv'
+NO_FIRE_WEATHER_SEQUENCES_SMALL = f'{DATA_DIRECTORY}/training_data/No_Fire_Weather_Sequences_Small.csv'
 
 
 def assemble_all_data() -> None:
@@ -61,7 +62,6 @@ def assemble_all_data() -> None:
     make_processed_fire_weather_data()
 
 
-@st.cache
 def read_fire_disturbance_point() -> pd.DataFrame:
     """
     Read the csv containing fire disturbance point data, and return a dataframe
@@ -71,7 +71,6 @@ def read_fire_disturbance_point() -> pd.DataFrame:
     return fires
 
 
-@st.cache
 def read_fire_disturbance_area() -> pd.DataFrame:
     """
     Return a pandas dataframe containing the data read from the fire disturbance area csv
@@ -80,7 +79,6 @@ def read_fire_disturbance_area() -> pd.DataFrame:
     return fires
 
 
-@st.cache
 def read_weather_station_data() -> pd.DataFrame:
     """
     Read the weather station data from the csv, and return it as a pandas DataFrame
@@ -89,7 +87,6 @@ def read_weather_station_data() -> pd.DataFrame:
     return data
 
 
-@st.cache
 def read_fire_disturbance_point_processed() -> pd.DataFrame:
     """
     Read the csv containing fire disturbance point data, and return a dataframe
@@ -99,21 +96,19 @@ def read_fire_disturbance_point_processed() -> pd.DataFrame:
     return fires
 
 
-@st.cache
 def read_fire_disturbance_area_processed() -> pd.DataFrame:
     """
-    Return a pandas dataframe containing the data read from the fire disturbance area csv
+    Return a pandas dataframe containing the data read from the fire disturbance area processed csv
     """
     fires = pd.read_csv(FIRE_AREA_PROCESSED)
     return fires
 
 
-@st.cache
-def read_weather_station_data() -> pd.DataFrame:
+def read_no_fire_weather_sequences() -> pd.DataFrame:
     """
-    Read the weather station data from the csv, and return it as a pandas DataFrame
+    Read the small-sized weather sequences from the csv, and return it as a pandas DataFrame
     """
-    data = pd.read_csv(NO_FIRE_WEATHER_SEQUENCES)
+    data = pd.read_csv(NO_FIRE_WEATHER_SEQUENCES_SMALL)
     return data
 
 
@@ -472,10 +467,10 @@ def make_processed_fire_weather_data() -> None:
     information (without INVALID entries).
     """
     processed_point = assemble_processed_fire_weather_data(FIRE_POINT_WEATHER)
-    processed_point.to_csv('./data/training_data/Fire_Disturbance_Point_Processed.csv')
+    processed_point.to_csv(FIRE_POINT_PROCESSED)
 
     processed_area = assemble_processed_fire_weather_data(FIRE_AREA_WEATHER)
-    processed_area.to_csv('./data/training_data/Fire_Disturbance_Area_Processed.csv')
+    processed_area.to_csv(FIRE_AREA_PROCESSED)
 
 
 # def remove_invalid_from_fire_point() -> None:
@@ -565,6 +560,52 @@ def to_list_of_str(lst: List) -> List[str]:
         new_lst.append(str(value))
     return new_lst
 
+
+def shrink_no_fire_weather_csv():
+    """
+    Save a smaller csv containing randomly sampled data from weather_df
+    """
+    weather_df = pd.read_csv(NO_FIRE_WEATHER_SEQUENCES)
+    weather_df = weather_df.sample(frac=0.09, random_state=1)
+    weather_df.to_csv(NO_FIRE_WEATHER_SEQUENCES_SMALL)
+
+
+def assemble_svm_training_csv() -> None:
+    """Save a csv file containing the data required to train the support vector machine"""
+    fire_point = read_fire_disturbance_point_processed()
+    fire_area = read_fire_disturbance_area_processed()
+    no_fire_weather = read_no_fire_weather_sequences()
+    temperature_data = list(fire_point['TEMPERATURE']) + list(fire_area['TEMPERATURE']) + list(no_fire_weather['TEMPERATURE'])
+    precipitation_data = list(fire_point['PRECIPITATION']) + list(fire_area['PRECIPITATION']) + list(no_fire_weather['PRECIPITATION'])
+    # fire_indicator shows whether or not a fire occured after the 21 day sequence (1 = fire, 0 = no fire)
+    fire_indicator = [1] * len(fire_point) + [1] * len(fire_area) + [0] * len(no_fire_weather)
+    final_data = pd.DataFrame({'TEMPERATURE': get_averages(temperature_data), 'PRECIPITATION': get_sums(precipitation_data), 'FIRE': fire_indicator})
+    final_data.to_csv('./data/training_data/svm_training_data.csv')
+
+
+def get_averages(lst: List):
+    """
+    Return a list containing the average of each string sequence
+    Precondintions:
+        - len(lst) > 0
+    """
+    avg_list = []
+    for string in lst:
+        splitted = string.split(',')
+        avg_list.append(statistics.mean([float(x) for x in splitted]))
+    return avg_list
+
+def get_sums(lst: List):
+    """
+    Return a list containing the sum of each string sequence
+    Precondintions:
+        - len(lst) > 0
+    """
+    avg_list = []
+    for string in lst:
+        splitted = string.split(',')
+        avg_list.append(sum([float(x) for x in splitted]))
+    return avg_list
 
 if __name__ == '__main__':
     # print(answer)

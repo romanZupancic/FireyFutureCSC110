@@ -3,8 +3,10 @@ import pandas as pd
 import streamlit as st
 import assemble_data
 import datetime
+import statistics
+from dataclasses import dataclass
 
-from typing import List, Optional
+from typing import List, Optional, Tuple, Dict
 
 CAUSE_REFERENCES = {'IDF': 'Foresting', 'IDO': 'Industrial',
                     'INC': 'Incedniary', 'LTG': 'Lightning',
@@ -12,9 +14,22 @@ CAUSE_REFERENCES = {'IDF': 'Foresting', 'IDO': 'Industrial',
                     'RES': 'Resident', 'RWY': 'Railway', 'UNK': 'Unkown'}
 
 
+@dataclass
+class WeatherAreaRegression():
+    """A dataclass containing a three-column pd.DataFrame and linear regression constants
+    for area burned vs temperature and weather
+
+    Instance Attributes:
+        - data: the DataFrame holding the data
+        - temp_regres: the regression constants against temperature data
+        - precip_regres: the regression constants agains the precipitation data
+    """
+    data: pd.DataFrame
+    regressions: Dict[str, Tuple[int, int]]
+
+
 # The st.cache decorator allows streamlit to cach the result of the operation, so
 # the page can be reloaded quickly when the inputs to this function are not changed
-@st.cache
 def fire_cause_count(fire_data: pd.DataFrame) -> pd.DataFrame:
     """
     Count the number of times each type of fire cause appears in the dataset
@@ -89,5 +104,67 @@ def string_date_to_date(date_time: str, scale: Optional[str] = '') -> datetime.d
         return datetime.datetime(int(year), int(month), int(day))
 
 
+@st.cache
+def area_burned_vs_weather(processed_data: pd.DataFrame,
+                           area_max_threshold: Optional[float] = 10000000) -> WeatherAreaRegression:
+    """
+    Return a pandas dataframe with the area burned of the fire on one axis, and the 
+    factor specified by factor on the other axis.
 
-WEATHER_STATION_COORDINATES = [[-83.09, 42.1], [-76.11, 45.19], [-88.91, 50.29], [-91.63, 48.76], [-77.88, 45.07], [-93.97, 48.63], [-77.39, 44.15], [-82.12, 49.38], [-75.67, 44.6], [-79.8, 43.3], [-88.34, 49.15], [-85.83, 47.33], [-76.91, 44.4], [-77.37, 46.05], [-78.17, 43.95], [-78.18, 43.97], [-79.54, 44.63], [-80.22, 44.5], [-74.75, 45.02], [-81.73, 45.33], [-80.55, 42.87], [-76.25, 45.03], [-81.9, 42.25], [-80.38, 43.7], [-80.33, 43.73], [-78.97, 42.88], [-79.88, 43.64], [-81.72, 43.77], [-82.95, 45.63], [-75.85, 44.42], [-78.53, 45.03], [-79.91, 43.29], [-76.69, 44.43], [-75.63, 45.0], [-81.48, 45.97], [-81.62, 44.17], [-82.67, 42.04], [-80.0, 48.15], [-79.22, 44.55], [-87.94, 52.2], [-81.15, 43.03], [-80.05, 42.53], [-76.08, 44.52], [-82.02, 46.19], [-80.65, 51.27], [-80.75, 43.98], [-84.16, 49.75], [-81.64, 42.51], [-76.78, 45.05], [-79.44, 44.6], [-78.83, 43.87], [-75.72, 45.38], [-85.43, 54.98], [-77.32, 45.95], [-77.25, 45.88], [-90.22, 51.45], [-77.15, 43.83], [-79.25, 42.87], [-79.25, 42.88], [-79.22, 43.25], [-93.72, 49.65], [-79.33, 43.04], [-80.47, 43.35], [-94.76, 49.47], [-79.63, 44.4], [-81.21, 42.77], [-75.06, 45.29], [-81.64, 42.98], [-80.72, 42.86], [-79.47, 43.78], [-77.53, 44.12], [-79.16, 44.26], [-90.47, 49.03], [-89.12, 48.37], [-80.37, 45.03], [-82.93, 42.33], [-80.77, 43.14], [-81.15, 43.86]]
+    The factor is averaged over the time period.
+
+    The processed_data argument has to take in data with the _Processed suffix.
+    """
+    factors = {'AREA BURNED': [],
+               'TEMPERATURE': [],
+               'PRECIPITATION': []}
+    
+    for _, row in processed_data.iterrows():
+        if row['FIRE_FINAL_SIZE'] <= area_max_threshold:
+            factors['AREA BURNED'].append(row['FIRE_FINAL_SIZE'])
+            for factor in ['TEMPERATURE', 'PRECIPITATION']:
+                factor_full = [float(temp) for temp in row[factor.upper()].split(',')]
+                factors[factor].append(statistics.mean(factor_full))
+
+    frame = pd.DataFrame(factors)
+    regressions = {'TEMPERATURE': linear_regression(frame, 'TEMPERATURE', 'AREA BURNED'),
+                   'PRECIPITATION': linear_regression(frame, 'PRECIPITATION', 'AREA BURNED')}
+    return WeatherAreaRegression(frame, regressions)
+        
+
+def linear_regression(data: pd.DataFrame, x: str, y: str) -> Tuple[float, float]:
+    """
+    Return the a and b values (constant and slope) of the simple linear regression over
+    data for columns x and y.
+    """
+    x_mean = data[x].mean()
+    y_mean = data[y].mean()
+    
+    b_numerator = sum((data[x][i] - x_mean) * (data[y][i] - y_mean) for i in range(1, data.shape[0]))
+    b_denominator = sum((data[x][i] - x_mean) ** 2 for i in range(1, data.shape[0]))
+    b = b_numerator / b_denominator
+
+    a = y_mean - b * x_mean
+
+    return (a, b)
+
+    
+def evaluate_linear_equation(a: int, b: int, x: int) -> int:
+    """
+    Return the value of the linear equation a + bx evalueated at x.
+    """
+    return a + b * x
+
+    
+@st.cache
+def graph_weather(data: pd.DataFrame) -> pd.DataFrame:
+    fire_df = data.copy()
+    temp_list = []
+    precip_list = []
+    for row, value in fire_df.iterrows():
+        temp_str = value['TEMPERATURE'].split(',')
+        precip_str = value['PRECIPITATION'].split(',')
+        temp_list.append(statistics.mean([float(x) for x in temp_str]))
+        precip_list.append(sum([float(x) for x in precip_str]))
+    frame = pd.DataFrame({'TEMPERATURE': temp_list, 'PRECIPITATION': precip_list})
+    return frame
