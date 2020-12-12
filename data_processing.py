@@ -4,6 +4,7 @@ import streamlit as st
 import assemble_data
 import datetime
 import statistics
+import math
 from dataclasses import dataclass
 
 from typing import List, Optional, Tuple, Dict
@@ -12,20 +13,6 @@ CAUSE_REFERENCES = {'IDF': 'Foresting', 'IDO': 'Industrial',
                     'INC': 'Incedniary', 'LTG': 'Lightning',
                     'MIS': 'Miscellaneous', 'REC': 'Recreation',
                     'RES': 'Resident', 'RWY': 'Railway', 'UNK': 'Unkown'}
-
-
-@dataclass
-class WeatherAreaRegression():
-    """A dataclass containing a three-column pd.DataFrame and linear regression constants
-    for area burned vs temperature and weather
-
-    Instance Attributes:
-        - data: the DataFrame holding the data
-        - temp_regres: the regression constants against temperature data
-        - precip_regres: the regression constants agains the precipitation data
-    """
-    data: pd.DataFrame
-    regressions: Dict[str, Tuple[int, int]]
 
 
 # The st.cache decorator allows streamlit to cach the result of the operation, so
@@ -106,19 +93,21 @@ def string_date_to_date(date_time: str, scale: Optional[str] = '') -> datetime.d
 
 @st.cache
 def area_burned_vs_weather(processed_data: pd.DataFrame,
-                           area_max_threshold: Optional[float] = 10000000) -> WeatherAreaRegression:
+                           area_max_threshold: Optional[float] = 10000000) -> pd.DataFrame:
     """
-    Return a pandas dataframe with the area burned of the fire on one axis, and the 
-    factor specified by factor on the other axis.
+    Return a pandas dataframe with the area burned by a fire and the
+    average temperatue and precipitation in the 21 days leading up to that fire.
 
-    The factor is averaged over the time period.
+    Does not process fires greater than area_max_threshold.
+
+    The factor is averaged over the 21 days.
 
     The processed_data argument has to take in data with the _Processed suffix.
     """
     factors = {'AREA BURNED': [],
                'TEMPERATURE': [],
                'PRECIPITATION': []}
-    
+
     for _, row in processed_data.iterrows():
         if row['FIRE_FINAL_SIZE'] <= area_max_threshold:
             factors['AREA BURNED'].append(row['FIRE_FINAL_SIZE'])
@@ -127,10 +116,8 @@ def area_burned_vs_weather(processed_data: pd.DataFrame,
                 factors[factor].append(statistics.mean(factor_full))
 
     frame = pd.DataFrame(factors)
-    regressions = {'TEMPERATURE': linear_regression(frame, 'TEMPERATURE', 'AREA BURNED'),
-                   'PRECIPITATION': linear_regression(frame, 'PRECIPITATION', 'AREA BURNED')}
-    return WeatherAreaRegression(frame, regressions)
-        
+    return frame
+
 
 def linear_regression(data: pd.DataFrame, x: str, y: str) -> Tuple[float, float]:
     """
@@ -139,7 +126,7 @@ def linear_regression(data: pd.DataFrame, x: str, y: str) -> Tuple[float, float]
     """
     x_mean = data[x].mean()
     y_mean = data[y].mean()
-    
+
     b_numerator = sum((data[x][i] - x_mean) * (data[y][i] - y_mean) for i in range(1, data.shape[0]))
     b_denominator = sum((data[x][i] - x_mean) ** 2 for i in range(1, data.shape[0]))
     b = b_numerator / b_denominator
@@ -148,14 +135,14 @@ def linear_regression(data: pd.DataFrame, x: str, y: str) -> Tuple[float, float]
 
     return (a, b)
 
-    
+
 def evaluate_linear_equation(a: int, b: int, x: int) -> int:
     """
     Return the value of the linear equation a + bx evalueated at x.
     """
     return a + b * x
 
-    
+
 @st.cache
 def graph_weather(data: pd.DataFrame) -> pd.DataFrame:
     fire_df = data.copy()
@@ -168,3 +155,16 @@ def graph_weather(data: pd.DataFrame) -> pd.DataFrame:
         precip_list.append(sum([float(x) for x in precip_str]))
     frame = pd.DataFrame({'TEMPERATURE': temp_list, 'PRECIPITATION': precip_list})
     return frame
+
+
+def predict_future_weather_data(data: pd.DataFrame) -> pd.DataFrame:
+    print(data)
+    nan_less = data.loc[not math.isnan(data['Max Temp (°C)'])]
+    nan_less = nan_less.loc[not math.isnan(nan_less['Total Precip (mm)'])]
+    print(nan_less)
+    for _, row in nan_less.iterrows():
+        new_temp = row['Max Temp (°C)'] + 1.6
+        row['Max Temp (°C)'] = new_temp
+        new_precip = row['Total Precip (mm)'] * 1.055
+        row['Total Precip (mm)'] = new_precip
+

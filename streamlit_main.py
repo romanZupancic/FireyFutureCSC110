@@ -35,16 +35,20 @@ FIRE_AREA_PROCESSED = assemble_data.read_fire_disturbance_area_processed()
 
 NO_FIRE_WEATHER_SEQUENCES = assemble_data.read_no_fire_weather_sequences()
 
+WEATHER_DATA = assemble_data.read_all_station_weather_data()
 
-def generate_regressive_plot(data: data_processing.WeatherAreaRegression, 
+data_processing.predict_future_weather_data(WEATHER_DATA)
+
+def generate_regressive_plot(data: pd.DataFrame,
                              x: str, y: str, title: str) -> go.Figure():
+    regression = data_processing.linear_regression(data, x, y)
     figure = go.Figure()
-    figure.add_trace(go.Scatter(x=data.data[x], y=data.data[y], mode='markers', name='Data'))
-    linear_x = [data.data[x].min(), data.data[x].max()]
-    linear_y = [data_processing.evaluate_linear_equation(data.regressions[x][0], 
-                                                         data.regressions[x][1], linear_x[0]),
-                data_processing.evaluate_linear_equation(data.regressions[x][0], 
-                                                         data.regressions[x][1], linear_x[1])]
+    figure.add_trace(go.Scatter(x=data[x], y=data[y], mode='markers', name='Data'))
+    linear_x = [data[x].min(), data[x].max()]
+    linear_y = [data_processing.evaluate_linear_equation(regression[0],
+                                                         regression[1], linear_x[0]),
+                data_processing.evaluate_linear_equation(regression[0],
+                                                         regression[1], linear_x[1])]
     figure.add_trace(go.Scatter(x=linear_x, y=linear_y, mode='lines', name='Regression Line'))
     figure.update_layout(title=title, xaxis_title=x, yaxis_title=y)
 
@@ -221,29 +225,19 @@ st.sidebar.title('Weather and fire severity')
 maximum_area = st.sidebar.slider('Maximum fire area burned', 0, 150000, 150000)
 
 st.header('''Weather and fire severity''')
-st.write('''The following graphs display the correlation between Average temperatures and 
+st.write('''The following graphs display the correlation between Average temperatures and
          average precipitations in the 21 days before a fire occured.''')
 # Area
 weather_v_area_area = data_processing.area_burned_vs_weather(FIRE_AREA_PROCESSED, maximum_area)
-# st.plotly_chart(px.scatter(weather_v_area_area, x='TEMPERATURE', y='AREA BURNED', 
+# st.plotly_chart(px.scatter(weather_v_area_area, x='TEMPERATURE', y='AREA BURNED',
 #                            title='Fire Disturbance Area: Temperature v. Area Burned'))
 # temperature_v_area_area = go.Figure()
-# temperature_v_area_area.add_trace(go.Scatter(x=weather_v_area_area[0]['TEMPERATURE'],
-#                                              y=weather_v_area_area[0]['AREA BURNED'],
-#                                              mode='markers'))
-# temperature_v_area_area.add_trace(go.Scatter(x=[0, weather_v_area_area[0]['TEMPERATURE'].iloc([-1])],
-#                                              y=[weather_v_area_area[1][0], 
-#                                                 data_processing.evaluate_linear_equation(weather_v_area_area[1][0], weather_v_area_area[1][1], weather_v_area_area[0]['TEMPERATURE'].iloc([-1]))],
-#                                              mode='lines'))
-# temperature_v_area_area.update_layout(title='Fire Disturbance Area: Temperature v. Area Burned',
-#                                       xaxis_title='TEMPERATURE',
-#                                       yaxis_title='AREA BURNED')
-temperature_v_area_area = generate_regressive_plot(weather_v_area_area, 
-                                                   'TEMPERATURE', 
+temperature_v_area_area = generate_regressive_plot(weather_v_area_area,
+                                                   'TEMPERATURE',
                                                    'AREA BURNED',
                                                    'Fire Disturbance Area: Temperature v. Area Burned')
 st.plotly_chart(temperature_v_area_area)
-st.write('''One of the most important takeaways from this visualization is 
+st.write('''One of the most important takeaways from this visualization is
          that fires have the potential to grow large at higher temperatures
          than at lower temperatures. This is evident with just the base graph
          (displaying a maximum area of 150000 hectares), where the highest
@@ -256,7 +250,7 @@ st.write('''One of the most important takeaways from this visualization is
          fires, temperatures from 15 degrees celcius onward sees a far
          greater concentration.''')
 
-st.plotly_chart(px.scatter(weather_v_area_area, x='PRECIPITATION', y='AREA BURNED', 
+st.plotly_chart(px.scatter(weather_v_area_area, x='PRECIPITATION', y='AREA BURNED',
                            title='Fire Disturbance Area: Precipitation v. Area Burned'))
 st.write('''This graph shows the negative correlation between precipitation
 and area burned: where higher precipitation results in weaker and less
@@ -267,8 +261,8 @@ st.plotly_chart(px.scatter_3d(weather_v_area_area, z='PRECIPITATION', y='AREA BU
                               title='Fire Disturbance Area: Precipitation v. Area Burned ' + \
                               'v. Precipitation'))
 st.write('''Finally, we have a 3D graph plotting temperature, precipitation, and fire area burned
-         on 3 separate axis. It (unsurprisingly) seems that fires tend to spread the farthest 
-         under low precipitations and high temperatures. However, the opposite is not true: 
+         on 3 separate axis. It (unsurprisingly) seems that fires tend to spread the farthest
+         under low precipitations and high temperatures. However, the opposite is not true:
          just because a fire happens under dry and hot conditions does not mean it will grow
          very large: hence, the large blob of datapoints at the lower ends of the temperature and
          precipitation axis.''')
@@ -277,12 +271,12 @@ st.write('''It also seems that precipitation has a much larger effect on fire fr
          axis than on the temperature axis.''')
 
 # Point
-weather_v_area_point = data_processing.area_burned_vs_weather(FIRE_POINT_PROCESSED, 
-                                                                     10000)[0]
-st.plotly_chart(px.scatter(weather_v_area_point, x='TEMPERATURE', y='AREA BURNED', 
+weather_v_area_point = data_processing.area_burned_vs_weather(FIRE_POINT_PROCESSED,
+                                                                     10000)
+st.plotly_chart(px.scatter(weather_v_area_point, x='TEMPERATURE', y='AREA BURNED',
                            title='Fire Disturbance Point: Temperature v. Area Burned'))
 
-st.plotly_chart(px.scatter(weather_v_area_point, x='PRECIPITATION', y='AREA BURNED', 
+st.plotly_chart(px.scatter(weather_v_area_point, x='PRECIPITATION', y='AREA BURNED',
                            title='Fire Disturbance Point: Precipitation v. Area Burned'))
 
 st.plotly_chart(px.scatter_3d(weather_v_area_point, z='PRECIPITATION', y='AREA BURNED',

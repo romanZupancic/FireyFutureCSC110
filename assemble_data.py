@@ -29,7 +29,7 @@ WEATHER_STATION_RAW = f'{DATA_DIRECTORY}/Station Inventory EN.csv'
 # Segregated sets
 FIRE_AREA_FILTERED =f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Area_Filtered.csv'
 FIRE_POINT_FILTERED = f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Point_Filtered.csv'
-WEATHER_STATION_OUTPUT = f'{DATA_DIRECTORY}/processed_data/weather_station_data.csv'
+CULLED_WEATHER_DATA = f'{DATA_DIRECTORY}/processed_data/weather_station_data_2019.csv'
 WEATHER_STATION_LOCATIONS = f'{DATA_DIRECTORY}/processed_data/weather_station_location_info.csv'
 
 # Sets of combined data
@@ -79,11 +79,11 @@ def read_fire_disturbance_area() -> pd.DataFrame:
     return fires
 
 
-def read_weather_station_data() -> pd.DataFrame:
+def read_all_station_weather_data() -> pd.DataFrame:
     """
     Read the weather station data from the csv, and return it as a pandas DataFrame
     """
-    data = pd.read_csv(WEATHER_STATION_OUTPUT)
+    data = pd.read_csv(CULLED_WEATHER_DATA)
     return data
 
 
@@ -140,7 +140,6 @@ def make_fire_disturbance_point() -> None:
     """
     Save the assembled fire disturbance point data to a csv.
     """
-    print('Saving Data')
     data = assemble_fire_disturbance_point()
     data.to_csv(FIRE_POINT_FILTERED)
 
@@ -189,7 +188,6 @@ def assemble_fire_disturbance_area() -> pd.DataFrame:
 
         # Name the headers for each column
         columnLabels = ['OGF_ID',
-                        'FIRE_TYPE_CODE',
                         'FIRE_START_DATE',
                         'FIRE_GENERAL_CAUSE_CODE',
                         'FIRE_FINAL_SIZE',
@@ -284,7 +282,11 @@ def make_weather_station_data() -> None:
                    for file in os.listdir(f'{DATA_DIRECTORY}/weather_data/') if '.csv' in file]
 
     # This file is actually too big for Github, so we mostly use the individual files
-    pd.concat(data_frames).to_csv(WEATHER_STATION_OUTPUT)
+    full_data = pd.concat(data_frames)
+    print(full_data)
+    new_data = full_data.loc[full_data['Year'] == 2019]
+
+    new_data.to_csv(CULLED_WEATHER_DATA)
 
 
 def assemble_weather_station_locations() -> pd.DataFrame:
@@ -473,22 +475,6 @@ def make_processed_fire_weather_data() -> None:
     processed_area.to_csv(FIRE_AREA_PROCESSED)
 
 
-# def remove_invalid_from_fire_point() -> None:
-#     """Remove all rows from fire point data that contain INVALID values for temperature or precipitation"""
-#     fires = pd.read_csv(FIRE_POINT_WEATHER)
-#     fires = fires.drop(index=fires.index[fires['TEMPERATURE'] == 'INVALID'])
-#     fires = fires.drop(index=fires.index[fires['PRECIPITATION'] == 'INVALID'])
-#     fires.to_csv('./data/training_data/Fire_Disturbance_Point_Processed.csv')
-
-
-# def remove_invalid_from_fire_area() -> None:
-#     """Remove all rows from fire point data that contain INVALID values for temperature or precipitation"""
-#     fires = pd.read_csv(FIRE_AREA_WEATHER)
-#     fires = fires.drop(index=fires.index[fires['TEMPERATURE'] == 'INVALID'])
-#     fires = fires.drop(index=fires.index[fires['PRECIPITATION'] == 'INVALID'])
-#     fires.to_csv('./data/training_data/Fire_Disturbance_Area_Processed.csv')
-
-
 def get_used_weather_files(fire_point, fire_area) -> Set[str]:
     """
     Return a set of all the weather stations that we used to get weather data for each of the fires
@@ -595,6 +581,7 @@ def get_averages(lst: List):
         avg_list.append(statistics.mean([float(x) for x in splitted]))
     return avg_list
 
+
 def get_sums(lst: List):
     """
     Return a list containing the sum of each string sequence
@@ -606,6 +593,63 @@ def get_sums(lst: List):
         splitted = string.split(',')
         avg_list.append(sum([float(x) for x in splitted]))
     return avg_list
+
+
+def assemble_ann_training_csv() -> None:
+    """Save a csv file containing the data required to train the support vector machine"""
+    fire_point = read_fire_disturbance_point_processed()
+    fire_area = read_fire_disturbance_area_processed()
+    no_fire_weather = read_no_fire_weather_sequences()
+    temperature_data = list(fire_point['TEMPERATURE']) + list(fire_area['TEMPERATURE']) + list(no_fire_weather['TEMPERATURE'])
+    precipitation_data = list(fire_point['PRECIPITATION']) + list(fire_area['PRECIPITATION']) + list(no_fire_weather['PRECIPITATION'])
+    # fire_indicator shows whether or not a fire occured after the 21 day sequence (1 = fire, 0 = no fire)
+    fire_indicator = [1] * len(fire_point) + [1] * len(fire_area) + [0] * len(no_fire_weather)
+    final_data = pd.DataFrame({'WEATHER': get_lists(temperature_data, precipitation_data), 'FIRE': fire_indicator})
+    final_data.to_csv('./data/training_data/ann_training_data.csv')
+
+
+def get_lists(temp: List, precip: List):
+    """
+    Return a list containing the average of each string sequence
+    Precondintions:
+        - len(temp) > 0
+        - len(precip) > 0
+    """
+    new_list = []
+    for i in range(len(temp)):
+        splitted_temp = temp[i].split(',')
+        splitted_precip = precip[i].split(',')
+        splitted = splitted_temp + splitted_precip
+        new_list.append([float(x) for x in splitted])
+    return new_list
+
+
+def assemble_dlstm_training_csv() -> None:
+    """Save a csv file containing the data required to train the support vector machine"""
+    fire_point = read_fire_disturbance_point_processed()
+    fire_area = read_fire_disturbance_area_processed()
+    no_fire_weather = read_no_fire_weather_sequences()
+    temperature_data = list(fire_point['TEMPERATURE']) + list(fire_area['TEMPERATURE']) + list(no_fire_weather['TEMPERATURE'])
+    precipitation_data = list(fire_point['PRECIPITATION']) + list(fire_area['PRECIPITATION']) + list(no_fire_weather['PRECIPITATION'])
+    # fire_indicator shows whether or not a fire occured after the 21 day sequence (1 = fire, 0 = no fire)
+    fire_indicator = [1] * len(fire_point) + [1] * len(fire_area) + [0] * len(no_fire_weather)
+    final_data = pd.DataFrame({'TEMPERATURE': to_list(temperature_data), 'PRECIPITATION': to_list(precipitation_data), 'FIRE': fire_indicator})
+    final_data.to_csv('./data/training_data/dlstm_training_data.csv')
+
+
+def to_list(lst: List):
+    """
+    Return a list containing the average of each string sequence
+    This function is different from get_lists() because it does not concatenate 2 input lists
+    Precondintions:
+        - len(lst) > 0
+    """
+    new_list = []
+    for i in range(len(lst)):
+        splitted = lst[i].split(',')
+        new_list.append([float(x) for x in splitted])
+    return new_list
+
 
 if __name__ == '__main__':
     # print(answer)
