@@ -29,7 +29,7 @@ WEATHER_STATION_RAW = f'{DATA_DIRECTORY}/Station Inventory EN.csv'
 # Segregated sets
 FIRE_AREA_FILTERED =f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Area_Filtered.csv'
 FIRE_POINT_FILTERED = f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Point_Filtered.csv'
-CULLED_WEATHER_DATA = f'{DATA_DIRECTORY}/processed_data/weather_station_data_2019.csv'
+CULLED_WEATHER_DATA = f'{DATA_DIRECTORY}/processed_data/weather_station_data_2011.csv'
 WEATHER_STATION_LOCATIONS = f'{DATA_DIRECTORY}/processed_data/weather_station_location_info.csv'
 
 # Sets of combined data
@@ -84,6 +84,7 @@ def read_all_station_weather_data() -> pd.DataFrame:
     Read the weather station data from the csv, and return it as a pandas DataFrame
     """
     data = pd.read_csv(CULLED_WEATHER_DATA)
+    data['Date/Time'] = pd.to_datetime(data['Date/Time'])
     return data
 
 
@@ -273,20 +274,25 @@ def make_individual_weather_data(year: int = 1998) -> None:
 
 def make_weather_station_data() -> None:
     """
-    Makes a giant csv file with all the weather station data.
-    Requires the existance of individual station data in {DATA_DIRECTORY}/weather_data/ in
-    the form of csv's.
+    Make a csv out of just weather data.
     """
+    year = 2011
+    fire_point = read_fire_disturbance_point_processed() 
+    fire_point = fire_point.loc[fire_point['FIRE_YEAR'] == year]
+    stations = get_used_weather_files(fire_point, fire_point)
     # Gather all the data into one list
+    # data_frames = [pd.read_csv(f'{DATA_DIRECTORY}/weather_data/{file}')
+    #                for file in os.listdir(f'{DATA_DIRECTORY}/weather_data/') if '.csv' in file]
     data_frames = [pd.read_csv(f'{DATA_DIRECTORY}/weather_data/{file}')
-                   for file in os.listdir(f'{DATA_DIRECTORY}/weather_data/') if '.csv' in file]
+                   for file in stations]
 
-    # This file is actually too big for Github, so we mostly use the individual files
-    full_data = pd.concat(data_frames)
-    print(full_data)
-    new_data = full_data.loc[full_data['Year'] == 2019]
+    data = pd.concat(data_frames)
 
-    new_data.to_csv(CULLED_WEATHER_DATA)
+    data = data.loc[data['Year'] == year]
+
+    print(data)
+
+    data.to_csv(CULLED_WEATHER_DATA)
 
 
 def assemble_weather_station_locations() -> pd.DataFrame:
@@ -360,18 +366,6 @@ def get_closest_weather_data(date: str, lon: float, lat: float) -> List[str]:
     station_file_path = choose_closest_station(lon, lat)
     station = pd.read_csv(f'{DATA_DIRECTORY}/weather_data/' + station_file_path)
     fire_date = date.split(' ')[0].split('/')
-    # fire_date = datetime.datetime(year=int(fire_date[0]), month=int(fire_date[1]), day=int(fire_date[2]))
-
-    # date_index = 0
-    # for row, data in station.iterrows():
-    #     # print(int(data['Year']))
-    #     # print(int(data['Month']))
-    #     # print(int(data['Day']))
-    #     current_date = datetime.datetime(year=int(data['Year']), month=int(data['Month']), day=int(data['Day']))
-
-    #     if current_date >= fire_date:
-    #         date_index = row
-    #         break
 
     # Format the date into a string that matches the csv
     fire_date = f'{fire_date[0]}-{fire_date[1]}-{fire_date[2]}'
@@ -610,7 +604,8 @@ def assemble_ann_training_csv() -> None:
 
 def get_lists(temp: List, precip: List):
     """
-    Return a list containing the average of each string sequence
+    Return a list of lists containing float representation for each value in each string sequence
+    Concatenate the temperature and precipitation lists together
     Precondintions:
         - len(temp) > 0
         - len(precip) > 0
@@ -639,7 +634,7 @@ def assemble_dlstm_training_csv() -> None:
 
 def to_list(lst: List):
     """
-    Return a list containing the average of each string sequence
+    Return a list of lists containing float representation for each value in each string sequence
     This function is different from get_lists() because it does not concatenate 2 input lists
     Precondintions:
         - len(lst) > 0

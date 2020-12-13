@@ -148,12 +148,6 @@ def load_ann():
     return statistics.mean([int(int(predictions[i] + 0.5) == test_y[i]) for i in range(len(test_y))])
 
 
-def mini_lstm():
-    model = Sequential()
-    model.add(tf.keras.layers.LSTM(1))
-    model.compile(optimizer='adam', loss='binary_crossentropy')
-
-
 def build_dlstm() -> tf.keras.Model():
     precipitation_input = tf.keras.Input(shape=(21, 1), name='PRECIPITATION')
     temperature_input = tf.keras.Input(shape=(21, 1), name='TEMPERATURE')
