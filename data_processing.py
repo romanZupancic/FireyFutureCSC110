@@ -1,4 +1,14 @@
-"""Helper functions to preform data processing/manipulation/rearranging."""
+"""
+The functions process the input data, running various algorithms on it.
+
+Some functions simply accumulate values and rearrange rows and columns, but others
+run calculations off the given data.
+
+Copyright and Usage Information
+===============================
+This file is Copyright (c) 2020 Daniel Hocevar and Roman Zupancic.
+"""
+
 import random
 from typing import List, Optional, Tuple, Union
 import datetime
@@ -240,6 +250,7 @@ def predict_fires(weather_data: pd.DataFrame, year: int) -> pd.DataFrame:
 
     This function uses the dlstm model to make predictions
     """
+    np.warnings.filterwarnings('ignore')
     data = weather_data.copy()
     weather_sequences = ([], [])
     weather_sequences_loc_reference = ([], [])

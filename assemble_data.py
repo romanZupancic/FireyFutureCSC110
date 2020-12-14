@@ -1,9 +1,21 @@
-"""Build the data sets from a variety of sources.
+"""
+Build the data sets from a variety of sources.
 Additionally, provide functions that read the datasets from their csvs.
 
 Functions with prefix "assemble" build the datasets into pandas dataframes.
 Functions with prefix "make" convert dataframes to csvs.
-Functions with prefux "read" read csvs into dataframes.
+Functions with prefxx "read" read csvs into dataframes.
+
+Actions not marked "read" are considered pre-processing of the raw data files.
+This pre-processing can take around 30 minutes, depending on your internet connection
+and processor.
+
+Copyright and Usage Information
+===============================
+This file is Copyright (c) 2020 Daniel Hocevar and Roman Zupancic.
+
+This files contents may not be modified or redistributed without written
+permission from Daniel Hocevar and Roman Zupancic
 """
 
 import json
@@ -13,7 +25,6 @@ import math
 import statistics
 import requests
 import pandas as pd
-
 
 DELIMITER = '","'  # Since the government likes microsoft, we have to use weird delimiters
 DATA_DIRECTORY = "./data"
@@ -142,6 +153,36 @@ def read_no_fire_weather_sequences() -> pd.DataFrame:
     data = pd.read_csv(NO_FIRE_WEATHER_SEQUENCES_SMALL)
     return data
 
+
+def read_svm_training_data() -> pd.DataFrame:
+    """Return a dataframe containing the data from /data/training_data/svm_training_data.csv"""
+    svm_data = pd.read_csv(SVM_DATA)
+    final_svm_data = pd.DataFrame({'TEMPERATURE': svm_data['TEMPERATURE'],
+                                   'PRECIPITATION': svm_data['PRECIPITATION'],
+                                   'FIRE': svm_data['FIRE']})
+    return final_svm_data
+
+
+def read_ann_training_data() -> pd.DataFrame:
+    """Return a dataframe containing the data from /data/training_data/ann_training_data.csv"""
+    ann_data = pd.read_csv(ANN_DATA)
+
+    weather_total = []
+    for _, weather in ann_data['WEATHER'].iteritems():
+        weather_total.append([float(item) for item in weather.lstrip('[').rstrip(']').split(', ')])
+    final_ann_data = pd.DataFrame({'WEATHER': weather_total, 'FIRE': ann_data['FIRE']})
+    return final_ann_data
+
+
+def read_dlstm_training_data() -> pd.DataFrame:
+    """Return a dataframe containing the data from /data/training_data/rnn_training_data.csv"""
+    dlstm_data = pd.read_csv(DLSTM_DATA)
+    weather_total = {'TEMPERATURE': [], 'PRECIPITATION': []}
+    for _, weather in dlstm_data.iterrows():
+        for heading in ['TEMPERATURE', 'PRECIPITATION']:
+            weather_total[heading].append([float(item) for item in weather[heading].lstrip('[').rstrip(']').split(', ')])
+    final_dlstm_data = pd.DataFrame({'TEMPERATURE': weather_total['TEMPERATURE'], 'PRECIPITATION': weather_total['PRECIPITATION'], 'FIRE': dlstm_data['FIRE']})
+    return final_dlstm_data
 
 def assemble_fire_disturbance_point() -> pd.DataFrame:
     """
@@ -710,7 +751,7 @@ def get_averages(lst: List) -> List:
 def get_sums(lst: List) -> List:
     """
     Return a list containing the sum of each string sequence
-    Precondintions:
+    Preconditions:
         - len(lst) > 0
     """
     avg_list = []
@@ -726,7 +767,12 @@ if __name__ == '__main__':
         'extra-imports': ['pandas', 'streamlit', 'datetime', 'assemble_data'
                           'statistics', 'tensorflow', 'numpy', 'random', 'typing',
                           'json', 'os', 'math', 'statistics', 'requests'],
-        'allowed-io': ['print'],
+        'allowed-io': ['print', 'input'],
         'max-line-length': 100,
         'disable': ['R1705', 'C0200']
     })
+
+    should_build = input("Are you sure you want to build all data? (Y/n): ")
+    
+    if should_build == 'Y':
+        make_all_data()
