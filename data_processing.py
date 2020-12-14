@@ -4,15 +4,14 @@ import streamlit as st
 import assemble_data
 import datetime
 import statistics
-import math
-from dataclasses import dataclass
 import tensorflow as tf
 import numpy as np
 import random
 
-from typing import List, Optional, Tuple, Dict, Union
+from typing import List, Optional, Tuple, Union
 
-from assemble_data import to_list, get_used_weather_files, remove_nan_weather, read_fire_disturbance_area_processed, read_fire_disturbance_point_processed
+from assemble_data import remove_nan_weather, 
+    read_fire_disturbance_area_processed, read_fire_disturbance_point_processed
 
 CAUSE_REFERENCES = {'IDF': 'Foresting', 'IDO': 'Industrial',
                     'INC': 'Incedniary', 'LTG': 'Lightning',
@@ -36,7 +35,7 @@ def fire_cause_count(fire_data: pd.DataFrame) -> pd.DataFrame:
         # If the cause has been encountered before
         if CAUSE_REFERENCES[fire_cause] in cause_dict:
             cause_dict[CAUSE_REFERENCES[fire_cause]][0] += 1
-        else: # If the cause is not yet in the dictionary
+        else:  # If the cause is not yet in the dictionary
             cause_dict[CAUSE_REFERENCES[fire_cause]] = [1]
     cause_df = pd.DataFrame(cause_dict)
     transposed_df = cause_df.transpose()
@@ -120,7 +119,17 @@ def fire_frequency_over_time(frames: List[pd.DataFrame],
     return transposed_df
 
 
-def scale_date(in_date: Union[datetime.date, str], scale) -> datetime.datetime:
+def scale_date(in_date: Union[datetime.date, str], 
+    scale: Optional[str] = 'month') -> datetime.datetime:
+    """
+    Returns the input date as a datetime.datetime object whose actual values are only set
+    at scale. Values smaller than scale are set to 1.
+    
+    in_date: Either a string of the format '2001/06/09 00:00:00+00' or a 
+    datetime.datetime object
+    
+    scale: either 'DAY', 'MONTH', or 'YEAR'. Case insensitive
+    """
     if isinstance(in_date, datetime.date):
         if scale.upper() == 'YEAR':
             date = datetime.datetime(year=in_date.year, month=1, day=1)
@@ -188,10 +197,15 @@ def evaluate_linear_equation(a: int, b: int, x: int) -> int:
 
 @st.cache
 def graph_weather(data: pd.DataFrame) -> pd.DataFrame:
+    """
+    Return a dataframe with two columns
+    The first column contains the average temperature for each row in data
+    The second column contains the total precipitation for each row in data
+    """
     fire_df = data.copy()
     temp_list = []
     precip_list = []
-    for row, value in fire_df.iterrows():
+    for _, value in fire_df.iterrows():
         temp_str = value['TEMPERATURE'].split(',')
         precip_str = value['PRECIPITATION'].split(',')
         temp_list.append(statistics.mean([float(x) for x in temp_str]))
@@ -202,7 +216,7 @@ def graph_weather(data: pd.DataFrame) -> pd.DataFrame:
 
 def predict_future_weather_data(weather_data: pd.DataFrame, 
                                 delta_temp: Optional[float] = 1.6, 
-                                multi_precip: Optional[float] = 1.055) -> pd.DataFrame:
+                                multi_precip: Optional[float] = 5.5) -> pd.DataFrame:
     """
     Apply a shift to the input weather data by adding delta_temp to the temperature 
     and multiplying by multiplying total precipitation by multi_precip.
@@ -218,14 +232,19 @@ def predict_future_weather_data(weather_data: pd.DataFrame,
         new_temp = row['Max Temp (°C)'] + delta_temp
         data.at[idx, 'Max Temp (°C)'] = new_temp
         # print(f'End Temp: {row["Max Temp (°C)"]}')
-        new_precip = row['Total Precip (mm)'] * multi_precip
+        new_precip = row['Total Precip (mm)'] * (1 + (multi_precip / 100))
         data.at[idx, 'Total Precip (mm)'] = new_precip
+    print(weather_data['Max Temp (°C)'] < data['Max Temp (°C)'])
     return data
 
 
 @st.cache
 def predict_fires(weather_data: pd.DataFrame, year: int) -> pd.DataFrame:
-    #data = pd.read_csv('./data/processed_data/weather_station_data_2019.csv')
+    """
+    Based on a year's worth on input weather data, predict the number of fires which will occur un that year
+
+    This function uses the dlstm model to make predictions
+    """
     data = weather_data.copy()    
     weather_sequences = ([], [])
     weather_sequences_loc_reference = ([], [])
@@ -236,8 +255,8 @@ def predict_fires(weather_data: pd.DataFrame, year: int) -> pd.DataFrame:
         temp_list = list(station_data['Max Temp (°C)'])
         precip_list = list(station_data['Total Precip (mm)'])
         for i in range(len(temp_list) - 20):
-            temperature = remove_nan_weather(temp_list[i:i+21])
-            precipitation = remove_nan_weather(precip_list[i:i+21])
+            temperature = remove_nan_weather(temp_list[i:i + 21])
+            precipitation = remove_nan_weather(precip_list[i:i + 21])
             if temperature != ['INVALID'] and precipitation != ['INVALID']:
                 weather_sequences[0].append(temperature)
                 weather_sequences[1].append(precipitation)
@@ -254,23 +273,13 @@ def predict_fires(weather_data: pd.DataFrame, year: int) -> pd.DataFrame:
             fire_loc_reference[1].append(weather_sequences_loc_reference[1][i])
             fire_date_reference.append(datetime.date(year=year, month=1, day=1) + datetime.timedelta(days=weather_sequences_date[i]))
     return pd.DataFrame({'lon': fire_loc_reference[0], 
-                          'lat': fire_loc_reference[1],
-                          'FIRE_START_DATE': fire_date_reference})
-    # print(sum([int(x >= 0.94) for x in predictions]))
-    # fire_point = pd.read_csv('./data/training_data/Fire_Disturbance_Point_Processed.csv')
-    # fire_area = pd.read_csv('./data/training_data/Fire_Disturbance_Area_Processed.csv')
-    # print(fire_frequency_over_time([fire_point, fire_area], 'year').loc['2019-01-01', : ])
-    # #print(len(fire_point.loc[fire_point['FIRE_YEAR'] == 2011]))# + len(fires2.loc[fires['FIRE_YEAR'] == 2011]))
-    # actual_fire_longitudes = list(fire_point.loc[fire_point['FIRE_YEAR'] == 2019]['LONGITUDE']) #+ list(fire_area.loc['2019' in fire_area['FIRE_START_DATE']]['LONGITUDE'])
-    # actual_fire_latitudes = list(fire_point.loc[fire_point['FIRE_YEAR'] == 2019]['LATITUDE']) #+ list(fire_area.loc['2019' in fire_area['FIRE_START_DATE']]['LATITUDE'])
+                        'lat': fire_loc_reference[1],
+                            'FIRE_START_DATE': fire_date_reference})
 
-    # return [pd.DataFrame({'lon': actual_fire_longitudes, 'lat': actual_fire_latitudes}), 
-    #         pd.DataFrame({'lon': fire_loc_reference[0], 
-    #                       'lat': fire_loc_reference[1],
-    #                       'FIRE_START_DATE': fire_date_reference})]
 
 @st.cache
 def get_2019_fire_locations() -> pd.DataFrame:
+    """Return a dataframe containing the longitude and latitude coordinates of every fire which occured in 2019"""
     fire_point = pd.read_csv('./data/training_data/Fire_Disturbance_Point_Processed.csv')
     fire_area = pd.read_csv('./data/training_data/Fire_Disturbance_Area_Processed.csv')
     print(fire_frequency_over_time([fire_point, fire_area], 'year').loc['2019-01-01', :])
@@ -287,10 +296,9 @@ def get_2019_fire_locations() -> pd.DataFrame:
 
 
 def get_2019_fires_per_month() -> pd.DataFrame:
-
+    """Return a dataframe connecting the month of 2019 to the number of fires which occured in that month"""
     fire_point = pd.read_csv('./data/training_data/Fire_Disturbance_Point_Processed.csv')
     fire_area = pd.read_csv('./data/training_data/Fire_Disturbance_Area_Processed.csv')
-    months_in_2019 = [f'2019-{str(month).zfill(2)}-01' for month in range(1,13)]
     fires_per_month = fire_frequency_over_time([fire_point, fire_area], 'month')
     fires_2019_per_month = []
     fires_2019_start_dates = []
@@ -301,17 +309,35 @@ def get_2019_fires_per_month() -> pd.DataFrame:
     return pd.DataFrame({'MONTH': fires_2019_start_dates, '# of fires': fires_2019_per_month})
 
 
-def future_fires_per_month_graph_data(temp_adjust: float, precip_adjust: float) -> pd.DataFrame:
+def future_fires_per_month_graph_data(temp_adjust: float, precip_adjust: float) -> List[pd.DataFrame]:
+    """
+    Predict the number of fires per month in 2050 using the dlstm model and predicted weather data for 2050
+
+    Return a list containing two dataframes. One dataframe contains the number of fires per month in 2019
+    and the other contains the number of fires per month in 2050.
+    """
     fires_2019 = get_2019_fires_per_month()
     fires_2050 = fire_frequency_over_time([predict_fires(predict_future_weather_data(assemble_data.read_modern_weather_data(), temp_adjust, precip_adjust), 2019)], 'month')
-    combined_fires = {'FIRE_START_DATE': [], '# of fires': [], 'YEAR': []}
+    combined_fires = {'MONTH': [], '# of fires': [], 'YEAR': []}
+    combined_fires2 = {'MONTH': [], '# of fires': [], 'YEAR': []}
     for row, value in fires_2019.iterrows():
-        combined_fires.append([value['FIRE_START_DATE'], value['# of fires'], '2019'])
+        combined_fires['MONTH'].append(value['MONTH'])
+        combined_fires['# of fires'].append(value['# of fires'])
+        combined_fires['YEAR'].append('2019')
     for row, value in fires_2050.iterrows():
-        combined_fires.append([row, value['# of fires'], '2050'])
-    fires_2019['YEAR'] = ['2019'] * len(fires_2019)
-    fires_2050['YEAR'] = ['2050'] * len(fires_2050)
-    return pd.DataFrame()
-    return pd.concat([fires_2019, fires_2050])
+        combined_fires2['MONTH'].append(row)
+        combined_fires2['# of fires'].append(value['# of fires'])
+        combined_fires2['YEAR'].append('2050')
+    return [pd.DataFrame(combined_fires), pd.DataFrame(combined_fires2)]
 
-#fires_2050 = fire_frequency_over_time([predict_fires(predict_future_weather_data(0.5, 0.5), 2019)], 'month')
+
+if __name__ == '__main__':
+    import python_ta
+    python_ta.check_all(config={
+        'extra-imports': ['pandas', 'streamlit', 'datetime', 'assemble_data'
+                         'statistics', 'tensorflow', 'numpy', 'random', 'typing'],  
+        'allowed-io': [print], 
+        'max-line-length': 100,
+        'disable': ['R1705', 'C0200']
+    })
+    
