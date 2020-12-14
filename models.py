@@ -187,3 +187,14 @@ def train_dlstm() -> None:
     model.save('./data/models/dlstm_final.h5')
 
 train_dlstm()
+
+
+if __name__ == '__main__':
+    import python_ta
+    python_ta.check_all(config={
+        'extra-imports': ['pandas', 'streamlit', 'datetime', 'assemble_data',
+                          'statistics', 'tensorflow', 'numpy', 'random', 'typing'],  
+        'allowed-io': [], 
+        'max-line-length': 100,
+        'disable': ['R1705', 'C0200']
+    })
