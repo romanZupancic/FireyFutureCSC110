@@ -32,6 +32,10 @@ FIRE_POINT_FILTERED = f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Point_F
 CULLED_WEATHER_DATA = f'{DATA_DIRECTORY}/processed_data/weather_station_data_2019.csv'
 WEATHER_STATION_LOCATIONS = f'{DATA_DIRECTORY}/processed_data/weather_station_location_info.csv'
 
+# Sets of combined data
+FIRE_POINT_WEATHER = f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Point_Weather.csv'
+FIRE_AREA_WEATHER = f'{DATA_DIRECTORY}/processed_data/Fire_Disturbance_Area_Weather.csv'
+
 # Invalid data removed
 FIRE_POINT_PROCESSED = f'{DATA_DIRECTORY}/training_data/Fire_Disturbance_Point_Processed.csv'
 FIRE_AREA_PROCESSED = f'{DATA_DIRECTORY}/training_data/Fire_Disturbance_Area_Processed.csv'
@@ -58,15 +62,9 @@ def assemble_all_data() -> None:
     make_individual_weather_data()
     make_weather_station_locations()
 
-    # Combine and Process the fire data with the weather data
+    make_fire_data_with_weather()
+
     make_processed_fire_weather_data()
-    make_no_fire_weather_data()
-
-    make_small_no_fire_weather_data()
-
-    # Built the model datasets
-    make_model_data()
-
 
 
 def read_fire_disturbance_point() -> pd.DataFrame:
@@ -356,6 +354,16 @@ def assemble_fire_data_with_weather(fire_dataset: pd.DataFrame) -> pd.DataFrame:
     return fire_data
 
 
+def make_fire_data_with_weather() -> None:
+    """
+    Save both the point and area fire data csvs with their weather information
+    """
+    fire_point_data = assemble_fire_data_with_weather(read_fire_disturbance_point())
+    fire_point_data.to_csv(FIRE_POINT_WEATHER)
+    fire_area_data = assemble_fire_data_with_weather(read_fire_disturbance_area())
+    fire_area_data.to_csv(FIRE_AREA_WEATHER)
+
+
 def get_closest_weather_data(date: str, lon: float, lat: float) -> List[str]:
     """
     Return the weather station data from the closest station to the given longitude and latitude
@@ -463,12 +471,10 @@ def make_processed_fire_weather_data() -> None:
     Produces two csv's (for point and area data) that contains all fires with legitament weather
     information (without INVALID entries).
     """
-    point_weather = assemble_fire_data_with_weather(FIRE_POINT_FILTERED)
-    processed_point = assemble_processed_fire_weather_data(point_weather)
+    processed_point = assemble_processed_fire_weather_data(FIRE_POINT_WEATHER)
     processed_point.to_csv(FIRE_POINT_PROCESSED)
 
-    area_weather = assemble_fire_data_with_weather(FIRE_AREA_FILTERED)
-    processed_area = assemble_processed_fire_weather_data(area_weather)
+    processed_area = assemble_processed_fire_weather_data(FIRE_AREA_WEATHER)
     processed_area.to_csv(FIRE_AREA_PROCESSED)
 
 
@@ -481,13 +487,13 @@ def get_used_weather_files(fire_point, fire_area) -> Set[str]:
     return used_stations
 
 
-def assemble_no_fire_weather_data() -> pd.DataFrame:
+def create_no_fire_weather_data() -> None:
     """
     Get a dataset containing sequences of weather data which did not result in there being a fire
     """
     no_fire_weather_df = pd.DataFrame(columns=['TEMPERATURE', 'PRECIPITATION'])
-    fire_point = read_fire_disturbance_area_processed()
-    fire_area = read_fire_disturbance_point_processed()
+    fire_point = pd.read_csv(FIRE_POINT_PROCESSED)
+    fire_area = pd.read_csv(FIRE_AREA_PROCESSED)
     used_stations = get_used_weather_files(fire_point, fire_area)
     for station in list(used_stations):
         # if station != 'CARIBOU ISLAND (AUT)_7582.csv':
@@ -499,25 +505,10 @@ def assemble_no_fire_weather_data() -> pd.DataFrame:
         fire_days = set.union(set(fire_point_days), set(fire_area_days))
         print(len(fire_days))
         no_fire_weather_df = pd.concat([no_fire_weather_df, get_no_fire_weather_sequences(fire_days, station)])
-
-    return no_fire_weather_df
-
-
-def make_no_fire_weather_data(size: Optional[int] = 0.09) -> None:
-    no_fire_weather = assemble_no_fire_weather_data()
-    no_fire_weather.to_csv(NO_FIRE_WEATHER_SEQUENCES)
+    no_fire_weather_df.to_csv(NO_FIRE_WEATHER_SEQUENCES)
 
 
-def make_small_no_fire_weather_data():
-    """
-    Save a smaller csv containing randomly sampled data from weather_df
-    """
-    weather_df = pd.read_csv(NO_FIRE_WEATHER_SEQUENCES)
-    weather_df = weather_df.sample(frac=0.09, random_state=1)
-    weather_df.to_csv(NO_FIRE_WEATHER_SEQUENCES_SMALL)
-
-
-def get_no_fire_weather_sequences(fire_days, station_path) -> pd.DataFrame:
+def get_no_fire_weather_sequences(fire_days, station_path) -> List:
     """Create a csv file containing 21 day sequences of weather data in which a fire did not occur at the end of the 21 days"""
     weather_sequences = []
     weather_data = pd.read_csv('./data/weather_data/' + station_path)
@@ -559,7 +550,16 @@ def to_list_of_str(lst: List) -> List[str]:
     return new_lst
 
 
-def assemble_svm_training_data() -> pd.DataFrame:
+def shrink_no_fire_weather_csv():
+    """
+    Save a smaller csv containing randomly sampled data from weather_df
+    """
+    weather_df = pd.read_csv(NO_FIRE_WEATHER_SEQUENCES)
+    weather_df = weather_df.sample(frac=0.09, random_state=1)
+    weather_df.to_csv(NO_FIRE_WEATHER_SEQUENCES_SMALL)
+
+
+def assemble_svm_training_csv() -> None:
     """Save a csv file containing the data required to train the support vector machine"""
     fire_point = read_fire_disturbance_point_processed()
     fire_area = read_fire_disturbance_area_processed()
@@ -569,75 +569,7 @@ def assemble_svm_training_data() -> pd.DataFrame:
     # fire_indicator shows whether or not a fire occured after the 21 day sequence (1 = fire, 0 = no fire)
     fire_indicator = [1] * len(fire_point) + [1] * len(fire_area) + [0] * len(no_fire_weather)
     final_data = pd.DataFrame({'TEMPERATURE': get_averages(temperature_data), 'PRECIPITATION': get_sums(precipitation_data), 'FIRE': fire_indicator})
-    return final_data
-
-
-def assemble_ann_training_data() -> pd.DataFrame:
-    """Save a csv file containing the data required to train the support vector machine"""
-    fire_point = read_fire_disturbance_point_processed()
-    fire_area = read_fire_disturbance_area_processed()
-    no_fire_weather = read_no_fire_weather_sequences()
-    temperature_data = list(fire_point['TEMPERATURE']) + list(fire_area['TEMPERATURE']) + list(no_fire_weather['TEMPERATURE'])
-    precipitation_data = list(fire_point['PRECIPITATION']) + list(fire_area['PRECIPITATION']) + list(no_fire_weather['PRECIPITATION'])
-    # fire_indicator shows whether or not a fire occured after the 21 day sequence (1 = fire, 0 = no fire)
-    fire_indicator = [1] * len(fire_point) + [1] * len(fire_area) + [0] * len(no_fire_weather)
-    final_data = pd.DataFrame({'WEATHER': get_lists(temperature_data, precipitation_data), 'FIRE': fire_indicator})
-    return final_data
-
-
-def assemble_dlstm_training_data() -> pd.DataFrame:
-    """Save a csv file containing the data required to train the support vector machine"""
-    fire_point = read_fire_disturbance_point_processed()
-    fire_area = read_fire_disturbance_area_processed()
-    no_fire_weather = read_no_fire_weather_sequences()
-    temperature_data = list(fire_point['TEMPERATURE']) + list(fire_area['TEMPERATURE']) + list(no_fire_weather['TEMPERATURE'])
-    precipitation_data = list(fire_point['PRECIPITATION']) + list(fire_area['PRECIPITATION']) + list(no_fire_weather['PRECIPITATION'])
-    # fire_indicator shows whether or not a fire occured after the 21 day sequence (1 = fire, 0 = no fire)
-    fire_indicator = [1] * len(fire_point) + [1] * len(fire_area) + [0] * len(no_fire_weather)
-    final_data = pd.DataFrame({'TEMPERATURE': to_list(temperature_data), 'PRECIPITATION': to_list(precipitation_data), 'FIRE': fire_indicator})
-    return final_data
-
-
-def make_model_data() -> None:
-    svm_data = assemble_svm_training_data()
-    svm_data.to_csv(SVM_DATA)
-
-    ann_data = assemble_ann_training_data()
-    ann_data.to_csv(ANN_DATA)
-
-    dlstm_data = assemble_dlstm_training_data()
-    dlstm_data.to_csv(DLSTM_DATA)
-
-
-def to_list(lst: List):
-    """
-    Return a list of lists containing float representation for each value in each string sequence
-    This function is different from get_lists() because it does not concatenate 2 input lists
-    Precondintions:
-        - len(lst) > 0
-    """
-    new_list = []
-    for i in range(len(lst)):
-        splitted = lst[i].split(',')
-        new_list.append([float(x) for x in splitted])
-    return new_list
-
-
-def get_lists(temp: List, precip: List):
-    """
-    Return a list of lists containing float representation for each value in each string sequence
-    Concatenate the temperature and precipitation lists together
-    Precondintions:
-        - len(temp) > 0
-        - len(precip) > 0
-    """
-    new_list = []
-    for i in range(len(temp)):
-        splitted_temp = temp[i].split(',')
-        splitted_precip = precip[i].split(',')
-        splitted = splitted_temp + splitted_precip
-        new_list.append([float(x) for x in splitted])
-    return new_list
+    final_data.to_csv(SVM_DATA)
 
 
 def get_averages(lst: List):
@@ -664,6 +596,63 @@ def get_sums(lst: List):
         splitted = string.split(',')
         avg_list.append(sum([float(x) for x in splitted]))
     return avg_list
+
+
+def assemble_ann_training_csv() -> None:
+    """Save a csv file containing the data required to train the support vector machine"""
+    fire_point = read_fire_disturbance_point_processed()
+    fire_area = read_fire_disturbance_area_processed()
+    no_fire_weather = read_no_fire_weather_sequences()
+    temperature_data = list(fire_point['TEMPERATURE']) + list(fire_area['TEMPERATURE']) + list(no_fire_weather['TEMPERATURE'])
+    precipitation_data = list(fire_point['PRECIPITATION']) + list(fire_area['PRECIPITATION']) + list(no_fire_weather['PRECIPITATION'])
+    # fire_indicator shows whether or not a fire occured after the 21 day sequence (1 = fire, 0 = no fire)
+    fire_indicator = [1] * len(fire_point) + [1] * len(fire_area) + [0] * len(no_fire_weather)
+    final_data = pd.DataFrame({'WEATHER': get_lists(temperature_data, precipitation_data), 'FIRE': fire_indicator})
+    final_data.to_csv(ANN_DATA)
+
+
+def get_lists(temp: List, precip: List):
+    """
+    Return a list of lists containing float representation for each value in each string sequence
+    Concatenate the temperature and precipitation lists together
+    Precondintions:
+        - len(temp) > 0
+        - len(precip) > 0
+    """
+    new_list = []
+    for i in range(len(temp)):
+        splitted_temp = temp[i].split(',')
+        splitted_precip = precip[i].split(',')
+        splitted = splitted_temp + splitted_precip
+        new_list.append([float(x) for x in splitted])
+    return new_list
+
+
+def assemble_dlstm_training_csv() -> None:
+    """Save a csv file containing the data required to train the support vector machine"""
+    fire_point = read_fire_disturbance_point_processed()
+    fire_area = read_fire_disturbance_area_processed()
+    no_fire_weather = read_no_fire_weather_sequences()
+    temperature_data = list(fire_point['TEMPERATURE']) + list(fire_area['TEMPERATURE']) + list(no_fire_weather['TEMPERATURE'])
+    precipitation_data = list(fire_point['PRECIPITATION']) + list(fire_area['PRECIPITATION']) + list(no_fire_weather['PRECIPITATION'])
+    # fire_indicator shows whether or not a fire occured after the 21 day sequence (1 = fire, 0 = no fire)
+    fire_indicator = [1] * len(fire_point) + [1] * len(fire_area) + [0] * len(no_fire_weather)
+    final_data = pd.DataFrame({'TEMPERATURE': to_list(temperature_data), 'PRECIPITATION': to_list(precipitation_data), 'FIRE': fire_indicator})
+    final_data.to_csv(DLSTM_DATA)
+
+
+def to_list(lst: List):
+    """
+    Return a list of lists containing float representation for each value in each string sequence
+    This function is different from get_lists() because it does not concatenate 2 input lists
+    Precondintions:
+        - len(lst) > 0
+    """
+    new_list = []
+    for i in range(len(lst)):
+        splitted = lst[i].split(',')
+        new_list.append([float(x) for x in splitted])
+    return new_list
 
 
 if __name__ == '__main__':
