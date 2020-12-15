@@ -1,5 +1,10 @@
 # The Python Libraries needed to run this project
 
+# CSC110 Modules
+hypothesis
+pytest
+python-ta
+
 # Visualization
 streamlit
 pydeck

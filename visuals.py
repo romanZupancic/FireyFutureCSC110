@@ -32,10 +32,10 @@ def section_introduction() -> None:
     st.image(img, use_column_width=True)
     st.title('Introduction')
     st.write('''Forest fires have always posed a major threat to Canadian forests.
-            These fires have become especially concerning within the past century, as the Canadian population has
-            boomed and rural areas have become popular destinations for both home
-            owners and cottagers. The looming threat of climate change has brought
-            an even greater uncertainty to already frightening threat of forest
+            These fires have become especially concerning within the past century,
+            as the Canadian population has boomed and rural areas have become popular
+            destinations for both home owners and cottagers. The looming threat of climate
+            change has brought an even greater uncertainty to already frightening threat of forest
             fires in Canada, and it is logical to assume that hotter and drier
             weather increases the risk of forest fires occurring. If climate
             change were to increase the severity of droughts - or increase any of the factors that
@@ -406,7 +406,8 @@ def section_predictions_vs_actual(present_weather_data) -> None:
              the maps do give a little insight into the correctness of the model. Since
              stronger areas are identified in about the same locations on both maps,
              we can make the conclusion that our model has at least been able to identify relative
-             chances for fires to break out (i.e some areas will recieve more fires than others).''')
+             chances for fires to break out (i.e some areas will
+             recieve more fires than others).''')
 
     st.write('''The following two graphs is an assessment of total fires over time.''')
     st.write('''Here is the actual distribution of fires:''')
@@ -458,7 +459,8 @@ def section_2050_predictions(present_weather_data) -> None:
     future_fire_locations = data_processing.predict_fires(
                                           data_processing.predict_future_weather_data(
                                               assemble_data.read_modern_weather_data(),
-                                              future_weather_temperature, future_weather_precipitation),
+                                              future_weather_temperature,
+                                              future_weather_precipitation),
                                           2019)
     st.write('''Here is the data you have configured:''')
     st.write('''Future Temperatures''')
