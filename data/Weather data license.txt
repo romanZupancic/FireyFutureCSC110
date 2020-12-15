@@ -1,0 +1,4 @@
+All files in the folder /weather_data and "Station Inventory EN.csv" contain copies of the the data from
+https://climate.weather.gc.ca/historical_data/search_historic_data_stations_e.html?searchType=stnProv&timeframe=1&lstProvince=ON&optLimit=yearRange&StartYear=1998&EndYear=2020&Year=2020&Month=12&Day=14&selRowPerPage=25
+
+The page where the data came from was titled "Station Results - Historical Data". No author for the data was specified.
