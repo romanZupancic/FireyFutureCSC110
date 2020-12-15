@@ -304,7 +304,7 @@ def filter_stations(min_year: int) -> pd.DataFrame:
 
     # Filter data based on year collected for
     filtered_first_year = unfiltered[unfiltered['First Year'] <= min_year]
-    filtered_last_year = filtered_first_year[unfiltered['Last Year'] == 2020]
+    filtered_last_year = filtered_first_year[filtered_first_year['Last Year'] == 2020]
     # Only look for Ontario data
     filtered_province = filtered_last_year[filtered_last_year['Province'] == 'ONTARIO']
     return filtered_province
@@ -504,14 +504,14 @@ def remove_nan_weather(weather_input: List[int]) -> List:
     weather = weather_input.copy()
     non_nan = []
     for i in range(len(weather)):
-        if not isinstance(weather[i], str) or not math.isnan(weather[i]):
+        if (not isinstance(weather[i], str) and weather[i] != 'nan') or not math.isnan(weather[i]):
             non_nan.append(weather[i])
     if len(non_nan) < 14:
         weather = ['INVALID']  # Rewrite the weather data with a more clear indicator
     else:
         avg_temp = statistics.mean(non_nan)
         for i in range(len(weather)):
-            if isinstance(weather[i], str) or math.isnan(weather[i]):
+            if (not isinstance(weather[i], str) and weather[i] != 'nan') or math.isnan(weather[i]):
                 weather[i] = avg_temp
     return weather
 
@@ -531,12 +531,14 @@ def make_processed_fire_weather_data() -> None:
     Produces two csv's (for point and area data) that contains all fires with legitament weather
     information (without INVALID entries).
     """
+    print('Making processed point')
     point = read_fire_disturbance_point()
     point_weather = assemble_fire_data_with_weather(point)
     point_weather.to_csv(UNPROCESSED_POINT_WEATHER)
     processed_point = assemble_processed_fire_weather_data(point_weather)
     processed_point.to_csv(FIRE_POINT_PROCESSED)
 
+    print('Making processed area')
     area = read_fire_disturbance_area()
     area_weather = assemble_fire_data_with_weather(area)
     area_weather.to_csv(UNPROCESSED_AREA_WEATHER)
