@@ -180,8 +180,12 @@ def read_dlstm_training_data() -> pd.DataFrame:
     weather_total = {'TEMPERATURE': [], 'PRECIPITATION': []}
     for _, weather in dlstm_data.iterrows():
         for heading in ['TEMPERATURE', 'PRECIPITATION']:
-            weather_total[heading].append([float(item) for item in weather[heading].lstrip('[').rstrip(']').split(', ')])
-    final_dlstm_data = pd.DataFrame({'TEMPERATURE': weather_total['TEMPERATURE'], 'PRECIPITATION': weather_total['PRECIPITATION'], 'FIRE': dlstm_data['FIRE']})
+            to_append = [float(item)
+                         for item in weather[heading].lstrip('[').rstrip(']').split(', ')]
+            weather_total[heading].append(to_append)
+    final_dlstm_data = pd.DataFrame({'TEMPERATURE': weather_total['TEMPERATURE'],
+                                     'PRECIPITATION': weather_total['PRECIPITATION'],
+                                     'FIRE': dlstm_data['FIRE']})
     return final_dlstm_data
 
 def assemble_fire_disturbance_point() -> pd.DataFrame:
@@ -762,17 +766,17 @@ def get_sums(lst: List) -> List:
 
 
 if __name__ == '__main__':
-    import python_ta
-    python_ta.check_all(config={
-        'extra-imports': ['pandas', 'streamlit', 'datetime', 'assemble_data'
-                          'statistics', 'tensorflow', 'numpy', 'random', 'typing',
-                          'json', 'os', 'math', 'statistics', 'requests'],
-        'allowed-io': ['print', 'input'],
-        'max-line-length': 100,
-        'disable': ['R1705', 'C0200']
-    })
+    # import python_ta
+    # python_ta.check_all(config={
+    #     'extra-imports': ['pandas', 'streamlit', 'datetime', 'assemble_data'
+    #                       'statistics', 'tensorflow', 'numpy', 'random', 'typing',
+    #                       'json', 'os', 'math', 'statistics', 'requests'],
+    #     'allowed-io': ['print', 'input'],
+    #     'max-line-length': 100,
+    #     'disable': ['R1705', 'C0200']
+    # })
 
     should_build = input("Are you sure you want to build all data? (Y/n): ")
-    
+
     if should_build == 'Y':
         make_all_data()

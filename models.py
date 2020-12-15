@@ -3,7 +3,7 @@ All model architecture and training loops are defined in this file.
 
 Copyright and Usage Information
 ===============================
-This file is Copyright (c) 2020 Daniel Hocevar and Roman Zupancic. 
+This file is Copyright (c) 2020 Daniel Hocevar and Roman Zupancic.
 
 This files contents may not be modified or redistributed without written
 permission from Daniel Hocevar and Roman Zupancic
@@ -25,7 +25,7 @@ def train_all_models() -> None:
     """
     Train all three models in this file (the SVM, the Artificial Neural Network,
     and the Recurrent Neural Network (DLSTM)).
-    
+
     Only the two neural networks are saved in the models directory.
     The svm must be trained every time.
     """
@@ -45,7 +45,7 @@ def train_all_models() -> None:
     dlstm_accuracy = load_dlstm()
     print(f'Final DLSTM Accuracy: {dlstm_accuracy * 100}%')
     print('Training Done!')
-    
+
 
 def train_svm() -> Tuple[svm.SVC, List, List]:
     """
@@ -150,7 +150,7 @@ def build_dlstm() -> tf.keras.Model():
     # Combine the two LSTM layers (and by extension their inputs) into
     # a single shape
     concatenated = tf.keras.layers.concatenate([precipitation_lstm, temperature_lstm])
-    
+
     # Process the combined data and draw more conclusions
     dense = tf.keras.layers.Dense(100, activation='relu')(concatenated)
 
@@ -210,7 +210,7 @@ def svm_train_test_split() -> Tuple[List, List]:
     svm_data = pd.DataFrame(shuffle(np.array(svm_data), random_state=0),
                             columns=['TEMPERATURE', 'PRECIPITATION', 'FIRE'])
     # Convert the data to a np.array
-    svm_x = np.array(pd.DataFrame({'TEMPERATURE': svm_data['TEMPERATURE'], 
+    svm_x = np.array(pd.DataFrame({'TEMPERATURE': svm_data['TEMPERATURE'],
                                    'PRECIPITATION': svm_data['PRECIPITATION']}))
     svm_y = np.array(svm_data['FIRE'])
 
@@ -282,16 +282,16 @@ def test_accuracy(model: Any, test_x: List, test_y: List) -> float:
 
 
 if __name__ == '__main__':
-    import python_ta
-    python_ta.check_all(config={
-        'extra-imports': ['pandas', 'sklearn', 'datetime', 'assemble_data', 'sklearn',
-                          'statistics', 'tensorflow', 'numpy', 'random', 'typing'],  
-        'allowed-io': [], 
-        'max-line-length': 100,
-        'disable': ['R1705', 'C0200']
-    })
+    # import python_ta
+    # python_ta.check_all(config={
+    #     'extra-imports': ['pandas', 'sklearn', 'datetime', 'assemble_data', 'sklearn',
+    #                       'statistics', 'tensorflow', 'numpy', 'random', 'typing'],
+    #     'allowed-io': [],
+    #     'max-line-length': 100,
+    #     'disable': ['R1705', 'C0200']
+    # })
 
     should_build = input("Are you sure you want to build all data? (Y/n): ")
-    
+
     if should_build == 'Y':
         train_all_models()
