@@ -504,14 +504,14 @@ def remove_nan_weather(weather_input: List[int]) -> List:
     weather = weather_input.copy()
     non_nan = []
     for i in range(len(weather)):
-        if (not isinstance(weather[i], str) and weather[i] != 'nan') or not math.isnan(weather[i]):
+        if isinstance(weather[i], str) or not math.isnan(weather[i]):
             non_nan.append(weather[i])
     if len(non_nan) < 14:
         weather = ['INVALID']  # Rewrite the weather data with a more clear indicator
     else:
         avg_temp = statistics.mean(non_nan)
         for i in range(len(weather)):
-            if (not isinstance(weather[i], str) and weather[i] != 'nan') or math.isnan(weather[i]):
+            if isinstance(weather[i], str) or math.isnan(weather[i]):
                 weather[i] = avg_temp
     return weather
 
