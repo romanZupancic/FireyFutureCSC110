@@ -7,7 +7,7 @@ much harder to organize the components. In these cases, we've just combined them
 
 Copyright and Usage Information
 ===============================
-This file is Copyright (c) 2020 Daniel Hocevar and Roman Zupancic. 
+This file is Copyright (c) 2020 Daniel Hocevar and Roman Zupancic.
 
 This files contents may not be modified or redistributed without written
 permission from Daniel Hocevar and Roman Zupancic
@@ -37,13 +37,13 @@ def section_introduction() -> None:
             owners and cottagers. The looming threat of climate change has brought
             an even greater uncertainty to already frightening threat of forest
             fires in Canada, and it is logical to assume that hotter and drier
-            weather increases the risk of forest fires occurring. If climate 
-            change were to increase the severity of droughts - or increase any of the factors that 
-            cause fires in the first place - the frequency and severity of forest 
+            weather increases the risk of forest fires occurring. If climate
+            change were to increase the severity of droughts - or increase any of the factors that
+            cause fires in the first place - the frequency and severity of forest
             fires could be impacted greatly. This project will
             determine if and how climate change affects forest fires in Ontario. We
             have procured a data set containing forest fire data for Ontario dating
-            back to 1998. First, we will manually analyze the data through graphs and 
+            back to 1998. First, we will manually analyze the data through graphs and
             simple projections. Then, we'll showcase some machine learning models
             we've developed to help predict the possibility of forest fires
             given some weather data. We will end with an interactive demo.''')
@@ -54,7 +54,7 @@ def section_introduction() -> None:
 
 def subsection_fire_locations(fire_point: pd.DataFrame, fire_area: pd.DataFrame) -> None:
     """
-    This section talks about fire location data. It plots fire location data for 
+    This section talks about fire location data. It plots fire location data for
     area and point data on maps.
     """
     st.header('Forest Fire Locations Since 1998')
@@ -107,7 +107,7 @@ def subsection_fire_cause_counts(cause_point: pd.DataFrame, cause_area: pd.DataF
     Ontario's forests: human-caused fires are far more likely to be smaller (and
     end up in the Fire Point database) than other fire causes.''')
 
-    
+
 def subsection_causes_over_time(cause_mapping: Dict[str, str],
                                 fire_point: pd.DataFrame,
                                 fire_area: pd.DataFrame) -> None:
@@ -132,10 +132,10 @@ def subsection_causes_over_time(cause_mapping: Dict[str, str],
                             if fire_cause_over_time_values[key]]
 
     st.write('Fire Disturbance Point:')
-    st.line_chart(data_processing.fire_cause_over_time(fire_point, 
+    st.line_chart(data_processing.fire_cause_over_time(fire_point,
                                                        enabled_cause_values, cause_timescale))
     st.write('And over the Fire Disturbance Area dataset:')
-    st.line_chart(data_processing.fire_cause_over_time(fire_area, 
+    st.line_chart(data_processing.fire_cause_over_time(fire_area,
                                                        enabled_cause_values, cause_timescale))
 
     st.write('''It is important to note the difference in scale between the
@@ -156,7 +156,7 @@ def subsection_causes_over_time(cause_mapping: Dict[str, str],
 
 def section_frequency_over_time(fire_area, fire_point) -> None:
     """
-    Displays UI for fire frequencies over time. 
+    Displays UI for fire frequencies over time.
     Combines fire_area and fire_point dataframe and plots them on a line graph.
     """
     st.title('Fire Frequency over Time')
@@ -166,7 +166,7 @@ def section_frequency_over_time(fire_area, fire_point) -> None:
     as the years go on. The following controls the resolution at which the
     fires are accumulated.''')
     freq_timescale = st.select_slider('Frequency Timescale', ['Year', 'Month', 'Day'], 'Year')
-    st.line_chart(data_processing.fire_frequency_over_time([fire_area, 
+    st.line_chart(data_processing.fire_frequency_over_time([fire_area,
                                                             fire_point], freq_timescale))
     st.write('''Interestingly, the year-by-year rates of fires appears to be
     decreasing: at the very least, the points of maximum are decreasing, but
@@ -177,13 +177,13 @@ def section_frequency_over_time(fire_area, fire_point) -> None:
     do find it interesting that the peaks in the last 7 years seem to be
     smaller than the peaks from 1998 - 2013.''')
 
-    
+
 def section_weather_fire_severity(fire_point, fire_area) -> None:
     """
-    Displays UI for fire severity vs temperature and precipitation for the data in 
+    Displays UI for fire severity vs temperature and precipitation for the data in
     fire_point and fire_area.
     """
-    st.title('''Weather and fire severity''') 
+    st.title('''Weather and fire severity''')
     st.write('''Before we get into
     modelling and making predictions for future forest fires, we need to
     analyse the factors that are most closely associated with the start of a
@@ -201,7 +201,7 @@ def section_weather_fire_severity(fire_point, fire_area) -> None:
     temperature_v_area_area = generate_regressive_plot(weather_v_area_area,
                                                        'TEMPERATURE',
                                                        'AREA BURNED',
-                                                       'Fire Disturbance Area: Temperature vs. ' + 
+                                                       'Fire Disturbance Area: Temperature vs. ' +
                                                        'Area Burned')
     st.plotly_chart(temperature_v_area_area)
     st.write('''One of the most important takeaways from this visualization
@@ -218,7 +218,7 @@ def section_weather_fire_severity(fire_point, fire_area) -> None:
     precipitation_v_area_area = generate_regressive_plot(weather_v_area_area,
                                                          'PRECIPITATION',
                                                          'AREA BURNED',
-                                                         'Fire Disturbance Area: Precipitation ' + 
+                                                         'Fire Disturbance Area: Precipitation ' +
                                                          'vs. Area Burned')
     st.plotly_chart(precipitation_v_area_area)
     st.write('''This graph shows the negative correlation between precipitation
@@ -243,7 +243,7 @@ def section_weather_fire_severity(fire_point, fire_area) -> None:
 
     # Point
     st.header('''Fire Disturbance Point''')
-    st.write('''The classification of Fire Disturbance Point (i.e. under 40 hectares) allow for 
+    st.write('''The classification of Fire Disturbance Point (i.e. under 40 hectares) allow for
             fires identified by it to happen more often, and under slightly different (but not so
             different) conditions than it's > 40 hectare counterpart.''')
     weather_v_area_point = fire_point
@@ -251,7 +251,7 @@ def section_weather_fire_severity(fire_point, fire_area) -> None:
     temperature_v_area_point = generate_regressive_plot(weather_v_area_point,
                                                     'TEMPERATURE',
                                                     'AREA BURNED',
-                                                    'Fire Disturbance Point: Temperature vs. ' + 
+                                                    'Fire Disturbance Point: Temperature vs. ' +
                                                     'Area Burned')
     st.plotly_chart(temperature_v_area_point)
     st.write('''Of particular note about this data is the temperature that it
@@ -263,13 +263,13 @@ def section_weather_fire_severity(fire_point, fire_area) -> None:
     temperatures. This is likely because, even though some fires get bigger,
     the majority do not and weigh the entire regression line down. The key
     takeaway here is that temperature does not make ALL fires bigger, but it
-    increases the chances for larger fires to occur and for more 
+    increases the chances for larger fires to occur and for more
     fires to occur.''')
 
     precipitation_v_area_point = generate_regressive_plot(weather_v_area_point,
                                                     'PRECIPITATION',
                                                     'AREA BURNED',
-                                                    'Fire Disturbance Point: Precipitation vs. ' + 
+                                                    'Fire Disturbance Point: Precipitation vs. ' +
                                                     'Area Burned')
     st.plotly_chart(precipitation_v_area_point)
     st.write('''Again, the greater the precipitation, the less chance that a
@@ -284,10 +284,10 @@ def section_weather_fire_severity(fire_point, fire_area) -> None:
                                 title='Fire Disturbance Point: Precipitation v. Area Burned ' + \
                                 'v. Precipitation'))
 
-    st.write('''Here we display the point data on the three axis graph, so we can get a better 
+    st.write('''Here we display the point data on the three axis graph, so we can get a better
             understanding into how our two factors interact with eachother and fire area.''')
 
-            
+
 def section_model_explanation(fire_point_temp_v_weather, no_fire_temp_v_weather) -> None:
     """
     The UI for the model expanation. Uses both graphs and images to explain how various models
@@ -322,14 +322,14 @@ def section_model_explanation(fire_point_temp_v_weather, no_fire_temp_v_weather)
     between average temperature/total precipitation and the occurence of a
     forest fire:
     """)
-    
+
     precipitation_vs_temperature = \
-        px.density_heatmap(fire_point_temp_v_weather, 
-                           x='TEMPERATURE', y='PRECIPITATION', nbinsx=30, nbinsy=30, 
-                           marginal_x='histogram', marginal_y='histogram', 
+        px.density_heatmap(fire_point_temp_v_weather,
+                           x='TEMPERATURE', y='PRECIPITATION', nbinsx=30, nbinsy=30,
+                           marginal_x='histogram', marginal_y='histogram',
                            title='TEMPERATURE vs PRECIPITATION in the 21 days before a fire')
     precipitation_vs_temperature_no_fire = \
-        px.density_heatmap(no_fire_temp_v_weather, x='TEMPERATURE', y='PRECIPITATION', 
+        px.density_heatmap(no_fire_temp_v_weather, x='TEMPERATURE', y='PRECIPITATION',
                            nbinsx=30, nbinsy=30, marginal_x='histogram', marginal_y='histogram',
                            title='TEMPERATURE vs PRECIPITATION in the 21 days without a fire')
 
@@ -337,13 +337,13 @@ def section_model_explanation(fire_point_temp_v_weather, no_fire_temp_v_weather)
     st.plotly_chart(precipitation_vs_temperature_no_fire)
 
     st.write("""The final trained SVM achieved an accuracy of 80.44% on the the test dataset
-    (i.e. given the average temperature and total precipitation over a 21 day period, 
-    the model is able to predict whether or not a fire will occur at the end of that 
+    (i.e. given the average temperature and total precipitation over a 21 day period,
+    the model is able to predict whether or not a fire will occur at the end of that
     21 day sequence with 79.7% accuracy)""")
 
     st.header('Model 2: Artificial Neural Network')
     st.write("""
-    The second model we have developed is an artificial neural network (ANN). 
+    The second model we have developed is an artificial neural network (ANN).
     This model was trained on 42 by 1 arrays containing both temperature and precipitation
     data for each of the 21 days in the sequence. The following is a diagram of the architecture
     of this ANN:
@@ -371,7 +371,7 @@ def section_model_explanation(fire_point_temp_v_weather, no_fire_temp_v_weather)
     the model is able to predict whether or not a fire will occur at the end
     of that 21 day sequence with 81.67% accuracy.""")
 
-    
+
 def section_predictions_vs_actual(present_weather_data) -> None:
     """
     The UI for analysis of the efficacy of our dlstm model.
@@ -398,13 +398,13 @@ def section_predictions_vs_actual(present_weather_data) -> None:
     st.pydeck_chart(heatmap_ontario(fire_locations_2019[['lon', 'lat']], '[lon, lat]'))
 
     st.write('''And here are the fires predicted by the dlstm model, where each fire was mapped
-            to the weather station from which the weather sequence was retrieved from 
+            to the weather station from which the weather sequence was retrieved from
             (each fire was offset by a random longitude and latitude value):''')
     st.pydeck_chart(heatmap_ontario(fire_predictions_2019[['lon', 'lat']], '[lon, lat]'))
 
     st.write('''While this is a largely superficial glance at the data our model produces,
-             the maps do give a little insight into the correctness of the model. Since 
-             stronger areas are identified in about the same locations on both maps, 
+             the maps do give a little insight into the correctness of the model. Since
+             stronger areas are identified in about the same locations on both maps,
              we can make the conclusion that our model has at least been able to identify relative
              chances for fires to break out (i.e some areas will recieve more fires than others).''')
 
@@ -467,12 +467,12 @@ def section_2050_predictions(present_weather_data) -> None:
     st.line_chart(future_date_vs_weather_data['Total Precip (mm)'])
 
     fires_2019_data = \
-        data_processing.future_fires_per_month_graph_data(future_weather_temperature, 
+        data_processing.future_fires_per_month_graph_data(future_weather_temperature,
                                                           future_weather_precipitation)
     fires_2019_data[0] = fires_2019_data[0].set_index('MONTH')
-        
+
     future_fires_data = \
-        data_processing.future_fires_per_month_graph_data(future_weather_temperature, 
+        data_processing.future_fires_per_month_graph_data(future_weather_temperature,
                                                           future_weather_precipitation)
     future_fires_data[1] = future_fires_data[1].set_index('MONTH')
 
@@ -485,11 +485,22 @@ def section_2050_predictions(present_weather_data) -> None:
                                     '[lon, lat]'))
     st.write('''Finally, here is the predicted heat map of fire locations:''')
     st.pydeck_chart(heatmap_ontario(future_fire_locations[['lon', 'lat']], '[lon, lat]'))
-    
+
     st.header('''Analysing the results of the Climate Scientist's numbers''')
     st.write('''Under the offsets calculated by actual climate scientists, we might be able to draw
-             some interesting conclusions about both the correctness of our model and the 
+             some interesting conclusions about both the correctness of our model and the
              frequency and locality of the fires of the future.''')
+    st.write('''First of all, looking at the prediction graph, there appears to be far fewer
+             overall fires. Secondly, it appears that (by looking at the map) the frequency
+             of fires is more even across all weather stations. As explained more in detail
+             in our accompanying project report, this is largely due to the nature of the
+             recurrent neural network: it does not extrapolate well. That is to say,
+             it can work within the parameters used to train it, and not beyond that.
+             And in our case, we are asking the neural network to calculate fires for
+             temperatures above the range of temperatures we trained it on, and with more
+             precipitation than what we trained it on. As a result, we believe
+             the model has under-predicted those weather patterns,
+             leading to far fewer identified fires.''')
 
 
 def heatmap_ontario(data: pd.DataFrame, positions: str) -> pdk.Deck:
@@ -519,9 +530,9 @@ def heatmap_ontario(data: pd.DataFrame, positions: str) -> pdk.Deck:
 def generate_regressive_plot(data: pd.DataFrame,
                              x: str, y: str, title: str) -> go.Figure():
     """Return a plotly scatter plot with a linear regression line along the data.
-    
+
     data is the data passed in, and x and y are the axis lables (that exist as columns in the data).
-    
+
     title is the title of the graph.
     """
     regression = data_processing.linear_regression(data, x, y)
